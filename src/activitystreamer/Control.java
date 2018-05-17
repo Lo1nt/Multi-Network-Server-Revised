@@ -11,11 +11,12 @@ import org.json.simple.parser.JSONParser;
 import activitystreamer.utils.Constant;
 import activitystreamer.utils.Settings;
 
-public class Control implements Runnable {
+public class Control extends Thread {
 
     private static Control control = null; 
     private static Connection parentNode, leftNode, rightNode;
     private static List<Connection> clientConns = null;
+    private static Listener listener;
     
     
     public static Control getInstance() {
@@ -25,9 +26,28 @@ public class Control implements Runnable {
         return control;
     }
     
-    public Control() {
+    private Control() {
         clientConns = new ArrayList<Connection>();
         
+        try {
+            listener = new Listener();
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
+        
+        start();
+    }
+    
+    /**
+     * 
+     * establish connection to another server
+     */
+    public void establishServerConn() {
+        
+        if (Settings.getRemoteHostname() != null) {
+            
+        }
     }
     
     

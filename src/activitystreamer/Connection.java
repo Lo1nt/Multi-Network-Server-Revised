@@ -20,7 +20,10 @@ public class Connection extends Thread {
     private boolean open = false;
     private boolean flag = false;
     
-    
+    /**
+     * establish connection; establish input and output stream for read and write;
+     * @param s
+     */
     public Connection(Socket s) {
         try {
             dis = new DataInputStream(s.getInputStream());
@@ -66,6 +69,19 @@ public class Connection extends Thread {
 
     public void setConnID(Integer connID) {
         this.connID = connID;
+    }
+
+
+
+    
+    public boolean writeMsg(String msg) {
+        
+        if (open) {
+            pw.println(msg);
+            pw.flush();
+            return true;
+        }
+        return false;
     }
 
     

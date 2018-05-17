@@ -6,7 +6,7 @@ public class Settings {
     private static Integer localPort = 3780;
     
     private static String remoteHostname = null;
-    private static Integer remotePort = 3780;
+    private static Integer remotePort = null;
     
     private static String serverSecret = null;
     
