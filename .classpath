@@ -7,5 +7,6 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="lib" path="/Users/minglun/Documents/eclipse-workspace/Multi-server-Network/lib/commons-cli-1.3.1/commons-cli-1.3.1.jar"/>
+	<classpathentry kind="lib" path="/Users/minglun/Documents/eclipse-workspace/COMP90015_AS2/lib/json_simple-1.1.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
