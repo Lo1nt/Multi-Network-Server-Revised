@@ -1,4 +1,4 @@
-package activitystreamer.utils;
+package activitystreamer.util;
 
 public class Constant {
     
