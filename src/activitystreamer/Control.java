@@ -5,10 +5,10 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+import activitystreamer.util.Constant;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
-import activitystreamer.utils.Constant;
 import activitystreamer.utils.Settings;
 
 public class Control extends Thread {
