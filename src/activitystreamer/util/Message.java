@@ -28,7 +28,7 @@ public class Message {
         json.put("command", Message.INVALID_MESSAGE);
         json.put("info", info);
         con.writeMsg(json.toJSONString());
-        System.out.println("invalid msg so I closed");
+//        System.out.println("invalid msg so I closed");
         con.closeCon();
         return true;
     }
@@ -45,7 +45,7 @@ public class Message {
         json.put("command", Message.AUTHENTICATION_FAIL);
         json.put("info", info);
         con.writeMsg(json.toJSONString());
-        System.out.println("authenticationFail so I closed");
+//        System.out.println("authenticationFail so I closed");
         con.closeCon();
         return true;
     }
@@ -92,7 +92,7 @@ public class Message {
         json.put("command", Message.REGISTER_FAILED);
         json.put("info", info);
         con.writeMsg(json.toJSONString());
-        System.out.println("register failed so I closed");
+//        System.out.println("register failed so I closed");
         return true;
     }
 
@@ -166,14 +166,14 @@ public class Message {
         return true;
     }
 
-    public synchronized static boolean redirect(Connection con, String address) {
+    public synchronized static boolean redirect(Connection con, String hostname, String port) {
         JSONObject json = new JSONObject();
         json.put("command", Message.REDIRECT);
-        String[] stringArr = address.split(":");
-        json.put("hostname", stringArr[0]);
-        json.put("port", Integer.parseInt(stringArr[1]));
+//        String[] stringArr = address.split(":");
+        json.put("hostname", hostname);
+        json.put("port", Integer.parseInt(port));
         con.writeMsg(json.toJSONString());
-        System.out.println("redirect so I closed");
+//        System.out.println("redirect so I closed");
         con.closeCon();
         return true;
     }

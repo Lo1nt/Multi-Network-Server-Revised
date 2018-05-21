@@ -5,12 +5,17 @@ import java.net.SocketAddress;
 public class User {
     private SocketAddress localSocketAddress;
     private String userName;
-    private String password;
+    private String secret;
 
-    public User(SocketAddress socketAddress, String userName, String password) {
+    public User(String userName, String secret) {
+        this.userName = userName;
+        this.secret = secret;
+    }
+
+    public User(SocketAddress socketAddress, String userName, String secret) {
         this.localSocketAddress = socketAddress;
         this.userName = userName;
-        this.password = password;
+        this.secret = secret;
     }
 
     public SocketAddress getLocalSocketAddress() {
@@ -29,11 +34,11 @@ public class User {
         this.userName = userName;
     }
 
-    public String getPassword() {
-        return password;
+    public String getSecret() {
+        return secret;
     }
 
-    public void setPassword(String password) {
-        this.password = password;
+    public void setSecret(String secret) {
+        this.secret = secret;
     }
 }

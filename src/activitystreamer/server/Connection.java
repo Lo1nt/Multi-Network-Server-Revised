@@ -25,6 +25,7 @@ public class Connection extends Thread {
 
     private Integer connID;
     private boolean flag = false;
+    private boolean isLoggedIn = false;
 
 
     public Connection(Socket s) throws IOException {
@@ -60,28 +61,6 @@ public class Connection extends Thread {
         }
     }
 
-//
-//    @Override
-//    public void run() {
-//        try {
-//            String data;
-//            while (!flag && (data = br.readLine()) != null) {
-//                // deal with incomming data
-////                flag = Control.getInstance().process(this, data);
-//            }
-//
-//
-//            // close connection
-////            Control.getInstance().connectionClosed(this);
-//            dis.close();
-//        } catch (IOException e) {
-//            // if exception, close connection
-////            Control.getInstance().connectionClosed(this);
-//        }
-//        open = false;
-//
-//    }
-
     @Override
     public void run() {
         try {
@@ -116,5 +95,11 @@ public class Connection extends Thread {
         this.connID = connID;
     }
 
+    public boolean isLoggedIn() {
+        return isLoggedIn;
+    }
 
+    public void setLoggedIn(boolean loggedIn) {
+        isLoggedIn = loggedIn;
+    }
 }
