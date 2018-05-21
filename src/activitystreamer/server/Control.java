@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import activitystreamer.util.Constant;
@@ -28,22 +29,10 @@ public class Control extends Thread {
     private Map<JSONObject, Connection> toBeRegisteredUsers;
     private Map<String, User> globalRegisteredUsers;
 
-
-
-    //    private static Connection parentConnection, lChildConnection, rChildConnection;
-    private static Map<String, Integer> loadMap = new ConcurrentHashMap<>();
-    private static List<User> userList; // the global registered users
-    private static Vector<SocketAddress> loginVector = new Vector<>();
-    private static Map<Connection, String[]> validateMap = new ConcurrentHashMap<>();
-    private static Map<Connection, String> registerMap = new ConcurrentHashMap<>();
-    private static Map<String, String[]> allowMap = new ConcurrentHashMap<>();
-
     // list to record if of cooperated servers;
-//    private String[] serverIdList = {"0", "0", "0"};
 
     public static final String SERVER = "SERVER";
     private int load;
-
 
     public static Control getInstance() {
         if (control == null) {
@@ -59,8 +48,6 @@ public class Control extends Thread {
         toBeRegisteredUsers = new ConcurrentHashMap<>();
         globalRegisteredUsers = new ConcurrentHashMap<>();
 
-        userList = new CopyOnWriteArrayList<>();
-        // userList = Collections.synchronizedList(new ArrayList<>());
         // start a listener
         try {
             listener = new Listener();

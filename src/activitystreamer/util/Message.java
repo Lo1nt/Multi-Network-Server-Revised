@@ -179,9 +179,7 @@ public class Message {
     }
 
     public synchronized static boolean activityBroadcast(Connection con, JSONObject activity) {
-//        JSONObject json = new JSONObject();
-//        json.put("command", Message.ACTIVITY_BROADCAST);
-//        json.put("activity", activity);
+
         con.writeMsg(activity.toJSONString());
         return false;
     }

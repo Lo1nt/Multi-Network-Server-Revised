@@ -8,8 +8,10 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.simple.JSONObject;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
@@ -270,17 +272,19 @@ public class ControlHelper {
             return Message.authenticationFail(con, "the user has not logged in yet");
         } else if (!control.getRegisteredUsers().containsKey(username) && control.getRegisteredUsers().get(username).getSecret().equals(secret)) {
             return Message.authenticationFail(con, "the username and secret do not match the logged in the user");
-        } else {
-            for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Control.SERVER) || (c.isLoggedIn())) {
-                    JSONObject broadcastAct = new JSONObject();
-                    broadcastAct.put("activity", activity);
-                    broadcastAct.put("command", Message.ACTIVITY_BROADCAST);
-                    Message.activityBroadcast(c, broadcastAct);
-                }
-            }
-            return false;
         }
+
+        JSONObject broadcastAct = new JSONObject();
+        broadcastAct.put("command", Message.ACTIVITY_BROADCAST);
+        broadcastAct.put("activity", activity);
+
+        for (Connection c : control.getConnections()) {
+            if (c.getName().equals(Control.SERVER) || c.isLoggedIn()) {
+                Message.activityBroadcast(c, activity);
+            }
+        }
+        return false;
+
     }
 
 
