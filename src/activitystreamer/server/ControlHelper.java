@@ -207,9 +207,6 @@ public class ControlHelper {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
         serverList.put((String) request.get("id"), request);
-
-        log.info(request.get("port") + " " + request.get("load"));
-
         broadcast(con, request);
         return false;
 
