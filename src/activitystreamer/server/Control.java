@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import activitystreamer.util.Constant;
@@ -526,13 +527,30 @@ public class Control extends Thread {
             return Message.authenticationFail(con, "the username and secret do not match the logged in the user, "
                     + "or the user has not logged in yet");
         }
+        
+        //initiate or update message queue
+        Constant.sendReceive.putIfAbsent(username, new ArrayList<Connection>());
+        
+        for (Connection c: clientConnections) {
+            Constant.sendReceive.get(username).add(c);
+            Constant.messageQueue.putIfAbsent(c, new ConcurrentLinkedQueue<JSONObject>());         
+            Constant.messageQueue.get(c).offer(broadcastAct);
+            
+        }
+        
+     // clean all message queues for specific username
+        for (Connection c : Constant.sendReceive.get(username)) {
+            while (!Constant.messageQueue.get(c).isEmpty()) {
+                Message.activityBroadcast(c, Constant.messageQueue.get(c).poll());
+                
+            }
+        }
+        
         return broadcastActivity(con, broadcastAct);
     }
 
     private boolean broadcastActivity(Connection sourceConnection, JSONObject activity) {
-        for (Connection c : clientConnections) {
-            Message.activityBroadcast(c, activity);
-        }
+        
         // broadcast activity to other servers except the one it comes from
         if (parentConnection != null && parentConnection != sourceConnection) {
             Message.activityBroadcast(parentConnection, activity);
