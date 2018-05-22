@@ -2,11 +2,8 @@ package activitystreamer.server;
 
 import java.io.IOException;
 import java.net.Socket;
-import java.net.SocketAddress;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import activitystreamer.util.Constant;
 import activitystreamer.util.Message;
@@ -27,7 +24,7 @@ public class Control extends Thread {
     private static Control control = null;
     private Map<String, User> registeredUsers;
     private Map<JSONObject, Connection> toBeRegisteredUsers;
-    private Map<String, User> globalRegisteredUsers;
+    private Map<String, User> externalRegisteredUsers;
 
     // list to record if of cooperated servers;
 
@@ -46,7 +43,7 @@ public class Control extends Thread {
         connections = Collections.synchronizedList(new ArrayList<>());
         registeredUsers = new ConcurrentHashMap<>();
         toBeRegisteredUsers = new ConcurrentHashMap<>();
-        globalRegisteredUsers = new ConcurrentHashMap<>();
+        externalRegisteredUsers = new ConcurrentHashMap<>();
 
         // start a listener
         try {
@@ -205,12 +202,12 @@ public class Control extends Thread {
         return toBeRegisteredUsers;
     }
 
-    public void addGlobalRegisteredUser(String username, String secret) {
-        globalRegisteredUsers.put(username, new User(username, secret));
+    public void addExternalRegisteredUser(String username, String secret) {
+        externalRegisteredUsers.put(username, new User(username, secret));
     }
 
-    public Map<String, User> getGlobalRegisteredUsers() {
-        return globalRegisteredUsers;
+    public Map<String, User> getExternalRegisteredUsers() {
+        return externalRegisteredUsers;
     }
 
 }

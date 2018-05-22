@@ -53,7 +53,7 @@ public class ClientSkeleton extends Thread {
 	public void sendActivityObject(JSONObject activityObj) {
     		if (activityObj.containsKey("activity")) {
     			JSONObject jo = new JSONObject();
-    			jo.put("command", "ACTIVITY_MESSAGE");
+    			jo.put("command", Message.ACTIVITY_MESSAGE);
     			jo.put("username", Settings.getUsername());
     			jo.put("secret", Settings.getUserSecret());
     			jo.put("activity", activityObj.get("activity"));
