@@ -95,7 +95,9 @@ public class ControlHelper {
 
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
-        if (!control.getRegisteredUsers().containsKey(username)) {
+        if (control.getRegisteredUsers().containsKey(username) || control.getExternalRegisteredUsers().containsKey(username)) {
+            return Message.registerFailed(con, username + " is already registered with the system"); // true
+        } else {
             control.addToBeRegisteredUser(request, con);
             lockAllowedCount.put(username, 0);
             if (serverList.size() == 0) { // if single server in the system
@@ -107,9 +109,8 @@ public class ControlHelper {
                     return Message.lockRequest(c, username, secret);
                 }
             }
-        } else {
-            return Message.registerFailed(con, username + " is already registered with the system"); // true
         }
+
         if (con.isLoggedIn()) {
             return Message.registerFailed(con, username + " is already registered with the system"); // true
         }
