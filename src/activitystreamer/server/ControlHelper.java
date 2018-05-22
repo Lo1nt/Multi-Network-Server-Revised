@@ -14,11 +14,14 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
     private static ControlHelper controlHelper = null;
-    private Control control = Control.getInstance();
-    private static Map<String, JSONObject> serverList = new ConcurrentHashMap<>();
-    private static Map<String, Integer> lockAllowedCount = new ConcurrentHashMap<>();
+    private Control control;
+    private static Map<String, JSONObject> serverList;
+    private static Map<String, Integer> lockAllowedCount;
 
     private ControlHelper() {
+        control = Control.getInstance();
+        serverList = new ConcurrentHashMap<>();
+        lockAllowedCount = new ConcurrentHashMap<>();
     }
 
     public static ControlHelper getInstance() {
@@ -228,7 +231,6 @@ public class ControlHelper {
             con.setLoggedIn(true);
             Message.loginSuccess(con, "logged in as user " + request.get("username"));
             for (String key : serverList.keySet()) {
-                log.warn(control.getLoad() + " : " + serverList.get(key).get("load"));
                 if (key != null && control.getLoad() - ((Long) serverList.get(key).get("load")).intValue() >= 2) {
                     return Message.redirect(con, (String) serverList.get(key).get("hostname"), "" + serverList.get(key).get("port"));
                 }
