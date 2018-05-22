@@ -57,9 +57,16 @@ public class ControlHelper {
                 return activityBroadcast(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);
+            case Message.SYNCHRONIZE_USER:
+                return synchronizeUser(request);
             default:
-                return Message.invalidMsg(con, "unknown message");
+                return false;
         }
+    }
+
+    private boolean synchronizeUser(JSONObject request) {
+        log.debug(request.toJSONString());
+        return false;
     }
 
     private boolean authenticate(Connection con, JSONObject request) {
@@ -77,6 +84,12 @@ public class ControlHelper {
 //        }
         // No reply if the authentication succeeded.
         con.setName(Connection.SERVER);
+
+        // synchronize all registered users to the new server
+        Map<String, User> externalUsers = new ConcurrentHashMap<>();
+        externalUsers.putAll(control.getLocalRegisteredUsers());
+        externalUsers.putAll(control.getExternalRegisteredUsers());
+        Message.synchronizeUser(con, externalUsers);
 
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
@@ -98,13 +111,13 @@ public class ControlHelper {
 
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
-        if (control.getRegisteredUsers().containsKey(username) || control.getExternalRegisteredUsers().containsKey(username)) {
+        if (control.getLocalRegisteredUsers().containsKey(username) || control.getExternalRegisteredUsers().containsKey(username)) {
             return Message.registerFailed(con, username + " is already registered with the system"); // true
         } else {
             control.addToBeRegisteredUser(request, con);
             lockAllowedCount.put(username, 0);
             if (serverList.size() == 0) { // if single server in the system
-                control.addRegisteredUser(username, secret);
+                control.addLocalRegisteredUser(username, secret);
                 return Message.registerSuccess(con, "register success for " + username);
             }
             for (Connection c : control.getConnections()) {
@@ -128,7 +141,7 @@ public class ControlHelper {
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
 
-        if (control.getRegisteredUsers().containsKey(username)) { // DENIED
+        if (control.getLocalRegisteredUsers().containsKey(username)) { // DENIED
             for (Connection c : control.getConnections()) {
                 if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockDenied(con, username, secret);
@@ -162,7 +175,7 @@ public class ControlHelper {
                 Connection c = control.getToBeRegisteredUsers().get(key);
                 if (c != null && username.equals(key.get("username"))) {
                     lockAllowedCount.remove(username);
-                    control.addRegisteredUser(username, (String) key.get("secret"));
+                    control.addLocalRegisteredUser(username, (String) key.get("secret"));
                     return Message.registerSuccess(c, "register success for " + username);
                 }
             }
@@ -209,7 +222,7 @@ public class ControlHelper {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
         serverList.put((String) request.get("id"), request);
-//        log.info(request.get("port") + " load: " + request.get("load"));
+        log.info(request.get("port") + " load: " + request.get("load"));
         broadcast(con, request);
         return false;
 
@@ -223,7 +236,7 @@ public class ControlHelper {
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
 
-        Map<String, User> registeredUsers = control.getRegisteredUsers();
+        Map<String, User> registeredUsers = control.getLocalRegisteredUsers();
         Map<String, User> externalRegisteredUsers = control.getExternalRegisteredUsers();
         if (username.equals("anonymous")
                 || registeredUsers.containsKey(username) && registeredUsers.get(username).getSecret().equals(secret)
@@ -232,6 +245,7 @@ public class ControlHelper {
             Message.loginSuccess(con, "logged in as user " + request.get("username"));
             for (String key : serverList.keySet()) {
                 if (key != null && control.getLoad() - ((Long) serverList.get(key).get("load")).intValue() >= 2) {
+                    log.debug("REDIRECT!!!" + serverList.get(key).get("port"));
                     return Message.redirect(con, (String) serverList.get(key).get("hostname"), "" + serverList.get(key).get("port"));
                 }
             }
@@ -270,7 +284,7 @@ public class ControlHelper {
 
         if (!con.isLoggedIn()) {
             return Message.authenticationFail(con, "the user has not logged in yet");
-        } else if (!(control.getRegisteredUsers().containsKey(username) && control.getRegisteredUsers().get(username).getSecret().equals(secret)) &&
+        } else if (!(control.getLocalRegisteredUsers().containsKey(username) && control.getLocalRegisteredUsers().get(username).getSecret().equals(secret)) &&
                 !(control.getExternalRegisteredUsers().containsKey(username) && control.getExternalRegisteredUsers().get(username).getSecret().equals(secret))) {
             // if user is neither registered locally or externally
             return Message.authenticationFail(con, "the username and secret do not match the logged in the user");

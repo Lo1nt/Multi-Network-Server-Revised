@@ -22,7 +22,7 @@ public class Control extends Thread {
     private static Listener listener;
 
     private static Control control = null;
-    private Map<String, User> registeredUsers;
+    private Map<String, User> localRegisteredUsers;
     private Map<JSONObject, Connection> toBeRegisteredUsers;
     private Map<String, User> externalRegisteredUsers;
 
@@ -38,7 +38,7 @@ public class Control extends Thread {
     private Control() {
         // initialize the connections array
         connections = Collections.synchronizedList(new ArrayList<>());
-        registeredUsers = new ConcurrentHashMap<>();
+        localRegisteredUsers = new ConcurrentHashMap<>();
         toBeRegisteredUsers = new ConcurrentHashMap<>();
         externalRegisteredUsers = new ConcurrentHashMap<>();
 
@@ -183,12 +183,12 @@ public class Control extends Thread {
         return connections;
     }
 
-    public void addRegisteredUser(String username, String secret) {
-        registeredUsers.put(username, new User(username, secret));
+    public void addLocalRegisteredUser(String username, String secret) {
+        localRegisteredUsers.put(username, new User(username, secret));
     }
 
-    public Map<String, User> getRegisteredUsers() {
-        return registeredUsers;
+    public Map<String, User> getLocalRegisteredUsers() {
+        return localRegisteredUsers;
     }
 
     public void addToBeRegisteredUser(JSONObject request, Connection con) {
