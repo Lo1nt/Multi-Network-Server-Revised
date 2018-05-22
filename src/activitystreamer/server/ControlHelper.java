@@ -73,7 +73,7 @@ public class ControlHelper {
 //            return Message.invalidMsg(con, "the server has already successfully authenticated");
 //        }
         // No reply if the authentication succeeded.
-        con.setName(Control.SERVER);
+        con.setName(Connection.SERVER);
 
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
@@ -105,7 +105,7 @@ public class ControlHelper {
                 return Message.registerSuccess(con, "register success for " + username);
             }
             for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Control.SERVER)) {
+                if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockRequest(c, username, secret);
                 }
             }
@@ -119,7 +119,7 @@ public class ControlHelper {
 
 
     private boolean onLockRequest(Connection con, JSONObject request) {
-        if (!con.getName().equals(Control.SERVER)) {
+        if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = (String) request.get("username");
@@ -127,7 +127,7 @@ public class ControlHelper {
 
         if (control.getRegisteredUsers().containsKey(username)) { // DENIED
             for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Control.SERVER)) {
+                if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockDenied(con, username, secret);
                 }
             }
@@ -135,7 +135,7 @@ public class ControlHelper {
             broadcast(con, request);
             control.addExternalRegisteredUser(username, secret);
             for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Control.SERVER)) {
+                if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockAllowed(con, username, secret);
                 }
             }
@@ -145,7 +145,7 @@ public class ControlHelper {
 
 
     private boolean onLockAllowed(Connection con, JSONObject request) {
-        if (!con.getName().equals(Control.SERVER)) {
+        if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = (String) request.get("username");
@@ -171,7 +171,7 @@ public class ControlHelper {
 
 
     private boolean onLockDenied(Connection con, JSONObject request) {
-        if (!con.getName().equals(Control.SERVER)) {
+        if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = (String) request.get("username");
@@ -194,7 +194,7 @@ public class ControlHelper {
     private boolean activityBroadcast(Connection con, JSONObject msg) {
         for (Connection c : control.getConnections()) {
             if (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
-                    && (c.getName().equals(Control.SERVER) || !c.getName().equals(Control.SERVER) && c.isLoggedIn())) {
+                    && (c.getName().equals(Connection.SERVER) || !c.getName().equals(Connection.SERVER) && c.isLoggedIn())) {
                 c.writeMsg(msg.toJSONString());
             }
         }
@@ -279,7 +279,7 @@ public class ControlHelper {
         broadcastAct.put("activity", activity);
 
         for (Connection c : control.getConnections()) {
-            if (c.getName().equals(Control.SERVER) || c.isLoggedIn()) {
+            if (c.getName().equals(Connection.SERVER) || c.isLoggedIn()) {
                 Message.activityBroadcast(c, broadcastAct);
             }
         }
@@ -291,7 +291,7 @@ public class ControlHelper {
     private void broadcast(Connection con, JSONObject request) {
         for (Connection c : control.getConnections()) {
             if (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
-                    && c.getName().equals(Control.SERVER)) {
+                    && c.getName().equals(Connection.SERVER)) {
                 c.writeMsg(request.toJSONString());
             }
         }

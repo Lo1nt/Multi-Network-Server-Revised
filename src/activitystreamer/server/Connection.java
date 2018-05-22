@@ -27,6 +27,8 @@ public class Connection extends Thread {
     private boolean flag = false;
     private boolean isLoggedIn = false;
 
+    public static final String SERVER = "SERVER";
+
 
     public Connection(Socket s) throws IOException {
         dis = new DataInputStream(s.getInputStream());

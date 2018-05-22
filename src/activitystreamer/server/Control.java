@@ -26,9 +26,6 @@ public class Control extends Thread {
     private Map<JSONObject, Connection> toBeRegisteredUsers;
     private Map<String, User> externalRegisteredUsers;
 
-    // list to record if of cooperated servers;
-
-    public static final String SERVER = "SERVER";
     private int load;
 
     public static Control getInstance() {
@@ -135,7 +132,7 @@ public class Control extends Thread {
     public synchronized Connection outgoingConnection(Socket s) throws IOException {
         log.debug("outgoing connection: " + Settings.socketAddress(s));
         Connection c = new Connection(s);
-        c.setName(SERVER);
+        c.setName(Connection.SERVER);
         connections.add(c);
         Message.authenticate(c);
         return c;
@@ -155,12 +152,12 @@ public class Control extends Thread {
 
             load = 0;
             for (Connection c : connections) {
-                if (!c.getName().equals(SERVER)) {
+                if (!c.getName().equals(Connection.SERVER)) {
                     load++;
                 }
             }
             for (Connection c : connections) {
-                if (c.isOpen() && c.getName().equals(SERVER)) {
+                if (c.isOpen() && c.getName().equals(Connection.SERVER)) {
                     Message.serverAnnounce(c, load);
                 }
             }
