@@ -148,6 +148,14 @@ public class Control extends Thread {
     public void run() {
         log.info("using activity interval of " + Settings.getActivityInterval() + " milliseconds");
         while (!term) {
+            // do something with 5 second intervals in between
+            try {
+                Thread.sleep(Settings.getActivityInterval());
+            } catch (InterruptedException e) {
+                log.info("received an interrupt, system is shutting down");
+                break;
+            }
+
             load = 0;
             for (Connection c : connections) {
                 if (!c.getName().equals(SERVER)) {
@@ -158,13 +166,6 @@ public class Control extends Thread {
                 if (c.isOpen() && c.getName().equals(SERVER)) {
                     Message.serverAnnounce(c, load);
                 }
-            }
-            // do something with 5 second intervals in between
-            try {
-                Thread.sleep(Settings.getActivityInterval());
-            } catch (InterruptedException e) {
-                log.info("received an interrupt, system is shutting down");
-                break;
             }
         }
         log.info("closing " + connections.size() + " connections");

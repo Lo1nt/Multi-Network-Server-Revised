@@ -207,6 +207,9 @@ public class ControlHelper {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
         serverList.put((String) request.get("id"), request);
+
+        log.info(request.get("port") + " load: " + request.get("load"));
+
         broadcast(con, request);
         return false;
 
@@ -228,6 +231,7 @@ public class ControlHelper {
             con.setLoggedIn(true);
             Message.loginSuccess(con, "logged in as user " + request.get("username"));
             for (String key : serverList.keySet()) {
+                log.warn(control.getLoad() + " : " + serverList.get(key).get("load"));
                 if (key != null && control.getLoad() - ((Long) serverList.get(key).get("load")).intValue() >= 2) {
                     return Message.redirect(con, (String) serverList.get(key).get("hostname"), "" + serverList.get(key).get("port"));
                 }
@@ -277,7 +281,7 @@ public class ControlHelper {
 
         for (Connection c : control.getConnections()) {
             if (c.getName().equals(Control.SERVER) || c.isLoggedIn()) {
-                Message.activityBroadcast(c, activity);
+                Message.activityBroadcast(c, broadcastAct);
             }
         }
         return false;
