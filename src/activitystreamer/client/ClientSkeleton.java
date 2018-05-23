@@ -2,11 +2,10 @@ package activitystreamer.client;
 
 import activitystreamer.util.Message;
 import activitystreamer.util.Settings;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 import java.io.*;
 import java.net.Socket;
@@ -22,7 +21,7 @@ public class ClientSkeleton extends Thread {
     private DataInputStream dis;
     private InputStreamReader isr;
     private BufferedReader br;
-    private JSONParser jp;
+    private JsonParser jp;
 
     public static ClientSkeleton getInstance() {
         if (clientSolution == null) {
@@ -36,7 +35,7 @@ public class ClientSkeleton extends Thread {
             socket = new Socket(Settings.getRemoteHostname(), Settings.getRemotePort());
             System.out.println("remote hostname and port is:");
             System.out.println(Settings.getRemoteHostname() + " " + Settings.getRemotePort());
-            jp = new JSONParser();
+            jp = new JsonParser();
             dos = new DataOutputStream(socket.getOutputStream());
             out = new PrintWriter(dos, true);
             dis = new DataInputStream(socket.getInputStream());
@@ -50,17 +49,17 @@ public class ClientSkeleton extends Thread {
     }
 
     @SuppressWarnings("unchecked")
-	public void sendActivityObject(JSONObject activityObj) {
-    		if (activityObj.containsKey("activity")) {
-    			JSONObject jo = new JSONObject();
-    			jo.put("command", Message.ACTIVITY_MESSAGE);
-    			jo.put("username", Settings.getUsername());
-    			jo.put("secret", Settings.getUserSecret());
-    			jo.put("activity", activityObj.get("activity"));
-    		//	{"activity":{"S":"S"}}
-    			activityObj = jo;
-    		}
-        out.write(activityObj.toJSONString() + "\n");
+    public void sendActivityObject(JsonObject activityObj) {
+        if (activityObj.has("activity")) {
+            JsonObject jo = new JsonObject();
+            jo.addProperty("command", Message.ACTIVITY_MESSAGE);
+            jo.addProperty("username", Settings.getUsername());
+            jo.addProperty("secret", Settings.getUserSecret());
+            jo.add("activity", activityObj.get("activity"));
+            //	{"activity":{"S":"S"}}
+            activityObj = jo;
+        }
+        out.write(activityObj.toString() + "\n");
         out.flush();
     }
 
@@ -84,7 +83,7 @@ public class ClientSkeleton extends Thread {
                 }
                 process(msg);
             }
-        } catch (IOException | ParseException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
     }
@@ -117,42 +116,44 @@ public class ClientSkeleton extends Thread {
 
     /**
      * process incoming message
+     *
      * @param msg
-     * @return JSONObject
+     * @return JsonObject
      * @throws ParseException
      * @throws IOException
      */
-	private void process(String msg) throws ParseException, IOException {
-        JSONObject jo = (JSONObject) jp.parse(msg);
+    private void process(String msg) throws IOException {
+        JsonObject jo = (JsonObject) jp.parse(msg);
         textFrame.setOutputText(jo);
-        String cmd = (String) jo.get("command");
+        String cmd = jo.get("command").getAsString();
         switch (cmd) {
-        case Message.REGISTER_SUCCESS:
-            out.write(Message.login(Settings.getUsername()) + "\n");
-            out.flush();
-            break;
-        
-        case Message.REDIRECT:
-            redirect(jo);
-            break;
-        case Message.REGISTER_FAILED:
-        case Message.INVALID_MESSAGE:
-            if (!socket.isClosed()) {
-                socket.close();
-            }
-            textFrame.setOutputText(Message.connCloseMsg());
-            break;     
+            case Message.REGISTER_SUCCESS:
+                out.write(Message.login(Settings.getUsername()) + "\n");
+                out.flush();
+                break;
+
+            case Message.REDIRECT:
+                redirect(jo);
+                break;
+            case Message.REGISTER_FAILED:
+            case Message.INVALID_MESSAGE:
+                if (!socket.isClosed()) {
+                    socket.close();
+                }
+                textFrame.setOutputText(Message.connCloseMsg());
+                break;
         }
     }
 
-	/**
-	 * deal with REDIRECT message received 
-	 * @param jo
-	 * @throws IOException
-	 */
-    private void redirect(JSONObject jo) throws IOException {
-        String hostname = (String) jo.get("hostname");
-        int port = ((Long) jo.get("port")).intValue();
+    /**
+     * deal with REDIRECT message received
+     *
+     * @param jo
+     * @throws IOException
+     */
+    private void redirect(JsonObject jo) throws IOException {
+        String hostname = jo.get("hostname").getAsString();
+        int port = ((Long) jo.get("port").getAsLong()).intValue();
         if (!socket.isClosed()) {
             socket.close();
         }

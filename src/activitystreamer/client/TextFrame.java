@@ -1,14 +1,8 @@
 package activitystreamer.client;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 
 import javax.swing.*;
 import javax.swing.border.Border;
@@ -23,7 +17,7 @@ public class TextFrame extends JFrame implements ActionListener {
     private JTextArea outputText;
     private JButton sendButton;
     private JButton disconnectButton;
-    private JSONParser parser = new JSONParser();
+    private JsonParser parser = new JsonParser();
     private StringBuffer outputMSG;
 
     public TextFrame() {
@@ -69,10 +63,10 @@ public class TextFrame extends JFrame implements ActionListener {
         setVisible(true);
     }
 
-    public void setOutputText(final JSONObject obj) {
+    public void setOutputText(final JsonObject obj) {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         JsonParser jp = new JsonParser();
-        JsonElement je = jp.parse(obj.toJSONString());
+        JsonElement je = jp.parse(obj.toString());
         String prettyJsonString = gson.toJson(je);
         outputMSG.append(prettyJsonString).append("\n");
         outputText.setText(outputMSG.toString());
@@ -84,11 +78,11 @@ public class TextFrame extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if (e.getSource() == sendButton) {
             String msg = inputText.getText().trim().replaceAll("\r", "").replaceAll("\n", "").replaceAll("\t", "");
-            JSONObject obj;
+            JsonObject obj;
             try {
-                obj = (JSONObject) parser.parse(msg);
+                obj = (JsonObject) parser.parse(msg);
                 ClientSkeleton.getInstance().sendActivityObject(obj);
-            } catch (ParseException e1) {
+            } catch (Exception e1) {
                 log.error("invalid JSON object entered into input text field, data not sent");
             }
 

@@ -4,11 +4,15 @@ import activitystreamer.util.Constant;
 import activitystreamer.util.Message;
 import activitystreamer.util.Settings;
 import activitystreamer.util.User;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.reflect.TypeToken;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.json.simple.JSONObject;
 
-import java.net.InetAddress;
+import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -17,16 +21,47 @@ public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
     private static ControlHelper controlHelper = null;
     private Control control;
-    private static Map<String, JSONObject> serverList; // all external servers
-    private static Map<String, Integer> lockAllowedCount;
+    private Map<String, JsonObject> otherServers; // all external servers
+    private Map<String, Integer> lockAllowedCount;
 
-    private static Map<String, Connection> lockRequestMap; // username, source port
+    private Map<String, Connection> lockRequestMap; // username, source port
+
+//    private Map<String, Long> lastAnnounceTimestamps;
+
+    private Map<Connection, List<Connection>> neighbors;
+
 
     private ControlHelper() {
         control = Control.getInstance();
-        serverList = new ConcurrentHashMap<>();
+        otherServers = new ConcurrentHashMap<>();
         lockAllowedCount = new ConcurrentHashMap<>();
         lockRequestMap = new ConcurrentHashMap<>();
+        neighbors = new ConcurrentHashMap<>();
+
+//        lastAnnounceTimestamps = new ConcurrentHashMap<>();
+
+//        new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//                while (true) {
+//                    try {
+//                        Thread.sleep(1000);
+//                    } catch (InterruptedException e) {
+//                        e.printStackTrace();
+//                    }
+//                    for (Map.Entry<String, Long> entry : lastAnnounceTimestamps.entrySet()) {
+//                        // 如果超过10秒钟没有收到announce，判定为超时，从server列表中移除
+//                        if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
+//                            otherServers.remove(entry.getKey());
+//                            lastAnnounceTimestamps.remove(entry.getKey());
+//                            log.debug(otherServers);
+//                        }
+//                    }
+//                }
+//            }
+//        }).start();
+
+
     }
 
     public static ControlHelper getInstance() {
@@ -36,7 +71,7 @@ public class ControlHelper {
         return controlHelper;
     }
 
-    public boolean process(String command, Connection con, JSONObject request) {
+    public boolean process(String command, Connection con, JsonObject request) {
         switch (command) {
             case Message.INVALID_MESSAGE:
                 return true;
@@ -64,30 +99,47 @@ public class ControlHelper {
                 return onReceiveServerAnnounce(con, request);
             case Message.SYNCHRONIZE_USER:
                 return synchronizeUser(request);
+            case Message.NEIGHBOR_ANNOUNCE:
+                return onReceiveNeighborAnnounce(request);
             default:
                 return false;
         }
     }
 
-    private boolean synchronizeUser(JSONObject request) {
-        log.debug(request.toJSONString());
+    private boolean onReceiveNeighborAnnounce(JsonObject request) {
+        Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
+        JsonObject jo = (JsonObject) request.get("neighbors");
+        Type type = new TypeToken<Map<Connection, List<Connection>>>() {
+        }.getType();
+        neighbors = gson.fromJson(jo.getAsString(), type);
+        log.debug("neighbors === " + neighbors);
         return false;
     }
 
-    private boolean authenticate(Connection con, JSONObject request) {
+    private boolean synchronizeUser(JsonObject request) {
+        Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
+        JsonObject users = (JsonObject) request.get("users");
+        Type type = new TypeToken<Map<String, User>>() {
+        }.getType();
+        Map<String, User> map = gson.fromJson(users.toString(), type);
+        control.getExternalRegisteredUsers().putAll(map);
+        log.debug("users === " + users);
+        return false;
+    }
+
+    private boolean authenticate(Connection con, JsonObject request) {
         if (request.get("secret") == null) {
             return Message.invalidMsg(con, "the received message did not contain a secret");
         }
-        String secret = (String) request.get("secret");
+        String secret = request.get("secret").getAsString();
         if (!secret.equals(Settings.getServerSecret())) {
             // if the secret is incorrect
             return Message.authenticationFail(con, "the supplied secret is incorrect: " + secret);
+        } else if (control.getConnections().contains(con) && con.isAuthenticated()) {
+            return Message.invalidMsg(con, "the server has already successfully authenticated");
         }
-// TODO
-//        else if (control.getConnections().contains(con)) {
-//            return Message.invalidMsg(con, "the server has already successfully authenticated");
-//        }
         // No reply if the authentication succeeded.
+        con.setAuthenticated(true);
         con.setName(Connection.SERVER);
 
         // synchronize all registered users to the new server
@@ -108,21 +160,22 @@ public class ControlHelper {
     }
 
 
-    private boolean register(Connection con, JSONObject request) {
-        log.debug(control.getConnections());
-        if (!request.containsKey("username") || !request.containsKey("secret")) {
+    private boolean register(Connection con, JsonObject request) {
+        if (!request.has("username") || !request.has("secret")) {
             Message.invalidMsg(con, "The message is incorrect");
             return true;
         }
 
-        String username = (String) request.get("username");
-        String secret = (String) request.get("secret");
-        if (control.getLocalRegisteredUsers().containsKey(username) || control.getExternalRegisteredUsers().containsKey(username)) {
+        String username = request.get("username").getAsString();
+        String secret = request.get("secret").getAsString();
+        // If username is registered locally or externally, then fail
+        if (control.getLocalRegisteredUsers().containsKey(username)
+                || control.getExternalRegisteredUsers().containsKey(username)) {
             return Message.registerFailed(con, username + " is already registered with the system"); // true
         } else {
             control.addToBeRegisteredUser(request, con);
             lockAllowedCount.put(username, 0);
-            if (serverList.size() == 0) { // if single server in the system
+            if (otherServers.size() == 0) { // if single server in the system
                 control.addLocalRegisteredUser(username, secret);
                 return Message.registerSuccess(con, "register success for " + username);
             }
@@ -148,17 +201,17 @@ public class ControlHelper {
      * @param request
      * @return
      */
-    private boolean onLockRequest(Connection con, JSONObject request) {
+    private boolean onLockRequest(Connection con, JsonObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
-        String username = (String) request.get("username");
-        String secret = (String) request.get("secret");
+        String username = request.get("username").getAsString();
+        String secret = request.get("secret").getAsString();
 
         lockRequestMap.put(username, con);
 
         if (control.getLocalRegisteredUsers().containsKey(username)) { // locally DENIED
-            // 对连接它的servers发送LOCK_DENIED
+            // send LOCK_DENIED to its connected servers
             for (Connection c : control.getConnections()) {
                 if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockDenied(con, username, secret);
@@ -168,35 +221,35 @@ public class ControlHelper {
             // 暂时把user信息加入到externalUsers里
             control.addExternalRegisteredUser(username, secret);
 
-            // 转发LOCK_REQUEST给其他server（除了消息来源的server）
+            // relay LOCK_REQUEST to other servers, except which it comes from
             relayMessage(con, request);
 
-            // 只对con(LOCK_REQUEST的来源)发送LOCK_ALLOWED
+            // only send LOCK_ALLOWED to con (which LOCK_REQUEST comes from)
             return Message.lockAllowed(con, username, secret);
         }
         return false;
     }
 
 
-    private boolean onLockAllowed(Connection con, JSONObject request) {
+    private boolean onLockAllowed(Connection con, JsonObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
-        String username = (String) request.get("username");
+        String username = request.get("username").getAsString();
         int count = 0;
         if (lockAllowedCount.get(username) != null) {
             count = lockAllowedCount.get(username);
         }
-        lockAllowedCount.put(username, ++count); // 本地对应的LOCK_ALLOWED计数 += 1
+        lockAllowedCount.put(username, ++count); // local LOCK_ALLOWED count += 1
 
         // 如果是register所在server
         // 如果收到了所有server发来的LOCK_ALLOWED，注册成功
-        if (serverList.size() == lockAllowedCount.get(username)) {
-            for (JSONObject key : control.getToBeRegisteredUsers().keySet()) {
+        if (otherServers.size() == lockAllowedCount.get(username)) {
+            for (JsonObject key : control.getToBeRegisteredUsers().keySet()) {
                 Connection c = control.getToBeRegisteredUsers().get(key);
-                if (c != null && username.equals(key.get("username"))) {
+                if (c != null && username.equals(key.get("username").getAsString())) {
                     lockAllowedCount.remove(username);
-                    control.addLocalRegisteredUser(username, (String) key.get("secret"));
+                    control.addLocalRegisteredUser(username, key.get("secret").getAsString());
                     return Message.registerSuccess(c, "register success for " + username);
                 }
             }
@@ -206,23 +259,23 @@ public class ControlHelper {
         // 只对LOCK_REQUEST的来源转发LOCK_ALLOWED
         if (lockRequestMap.get(username) != null) {
             Connection src = lockRequestMap.get(username);
-            src.writeMsg(request.toJSONString());
+            src.writeMsg(request.getAsString());
         }
 
         return false;
     }
 
 
-    private boolean onLockDenied(Connection con, JSONObject request) {
+    private boolean onLockDenied(Connection con, JsonObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
-        String username = (String) request.get("username");
+        String username = request.get("username").getAsString();
 
         // 如果是register所在server:
         // 清空toBeRegisteredUsers对应的username，并向它发送REGISTER_FAILED
-        for (Map.Entry<JSONObject, Connection> entry : control.getToBeRegisteredUsers().entrySet()) {
-            if (username.equals(entry.getKey().get("username"))) {
+        for (Map.Entry<JsonObject, Connection> entry : control.getToBeRegisteredUsers().entrySet()) {
+            if (username.equals(entry.getKey().get("username").getAsString())) {
                 Connection c = entry.getValue();
                 control.getToBeRegisteredUsers().remove(entry.getKey());
                 lockAllowedCount.remove(username);
@@ -240,41 +293,42 @@ public class ControlHelper {
     }
 
 
-    private boolean onReceiveServerAnnounce(Connection con, JSONObject request) {
+    private boolean onReceiveServerAnnounce(Connection con, JsonObject request) {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
-        serverList.put((String) request.get("id"), request);
+        log.debug(request.get("port") + ": " + request.get("load"));
+        otherServers.put(request.get("id").getAsString(), request);
+//        lastAnnounceTimestamps.put((String) request.get("id"), System.currentTimeMillis()); // TODO CHECK: 将每个server的announce时间戳记录下来
         relayMessage(con, request);
         return false;
 
     }
 
 
-    private boolean login(Connection con, JSONObject request) {
-        if (!request.containsKey("username")) {
+    private boolean login(Connection con, JsonObject request) {
+        if (!request.has("username")) {
             return Message.invalidMsg(con, "missed username");
         }
-        String username = (String) request.get("username");
-        String secret = (String) request.get("secret");
+        String username = request.get("username").getAsString();
+        String secret = request.get("secret").getAsString();
 
-        Map<String, User> registeredUsers = control.getLocalRegisteredUsers();
+        Map<String, User> localRegisteredUsers = control.getLocalRegisteredUsers();
         Map<String, User> externalRegisteredUsers = control.getExternalRegisteredUsers();
         if (username.equals("anonymous")
-                || registeredUsers.containsKey(username) && registeredUsers.get(username).getSecret().equals(secret)
+                || localRegisteredUsers.containsKey(username) && localRegisteredUsers.get(username).getSecret().equals(secret)
                 || externalRegisteredUsers.containsKey(username) && externalRegisteredUsers.get(username).getSecret().equals(secret)) {
             con.setLoggedIn(true);
             Message.loginSuccess(con, "logged in as user " + request.get("username"));
-            for (String key : serverList.keySet()) {
-                if (key != null && control.getLoad() - ((Long) serverList.get(key).get("load")).intValue() >= 2) {
-                    log.debug("REDIRECT!!!" + serverList.get(key).get("port"));
-                    return Message.redirect(con, (String) serverList.get(key).get("hostname"), "" + serverList.get(key).get("port"));
+            for (String key : otherServers.keySet()) {
+                if (key != null && control.getLoad() - ((Long) otherServers.get(key).get("load").getAsLong()).intValue() >= 2) {
+                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(), "" + otherServers.get(key).get("port"));
                 }
             }
             return false;
-        } else if (!registeredUsers.containsKey(username)) {
+        } else if (!localRegisteredUsers.containsKey(username)) {
             return Message.loginFailed(con, "client is not registered with the server");
-        } else if (registeredUsers.containsKey(username) && !(registeredUsers.get(username).getSecret().equals(secret))) {
+        } else if (localRegisteredUsers.containsKey(username) && !(localRegisteredUsers.get(username).getSecret().equals(secret))) {
             return Message.loginFailed(con, "attempt to login with wrong username");
         } else {
             return Message.loginFailed(con, "");
@@ -289,20 +343,20 @@ public class ControlHelper {
     }
 
 
-    private boolean onReceiveActivityMessage(Connection con, JSONObject request) {
-        if (!request.containsKey("username")) {
+    private boolean onReceiveActivityMessage(Connection con, JsonObject request) {
+        if (!request.has("username")) {
             return Message.invalidMsg(con, "the message did not contain a username");
         }
-        if (!request.containsKey("secret")) {
+        if (!request.has("secret")) {
             return Message.invalidMsg(con, "the message did not contain a secret");
         }
-        if (!request.containsKey("activity")) {
+        if (!request.has("activity")) {
             return Message.invalidMsg(con, "the message did not contain an activity");
         }
-        String username = (String) request.get("username");
-        String secret = (String) request.get("secret");
-        JSONObject activity = (JSONObject) request.get("activity");
-        activity.put("authenticated_user", username);
+        String username = request.get("username").getAsString();
+        String secret = request.get("secret").getAsString();
+        JsonObject activity = (JsonObject) request.get("activity");
+        activity.addProperty("authenticated_user", username);
 
         if (!con.isLoggedIn()) {
             return Message.authenticationFail(con, "the user has not logged in yet");
@@ -312,14 +366,14 @@ public class ControlHelper {
             return Message.authenticationFail(con, "the username and secret do not match the logged in the user");
         }
 
-        JSONObject broadcastAct = new JSONObject();
-        broadcastAct.put("command", Message.ACTIVITY_BROADCAST);
-        broadcastAct.put("activity", activity);
-        
+        JsonObject broadcastAct = new JsonObject();
+        broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
+        broadcastAct.add("activity", activity);
+
 
 //        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
 
-        
+
         relayMessage(con, broadcastAct);
         username = updateMessageQueue(broadcastAct);
 
@@ -337,11 +391,10 @@ public class ControlHelper {
     }
 
 
-    private boolean onReceiveActivityBroadcast(Connection con, JSONObject msg) {
+    private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
 
 //      continue pass this ACTIVITY_BROADCAST to other server
         relayMessage(con, msg);
-
 
         String username = updateMessageQueue(msg);
 
@@ -364,32 +417,32 @@ public class ControlHelper {
      * @param src
      * @param request
      */
-    private void relayMessage(Connection src, JSONObject request) {
+    private void relayMessage(Connection src, JsonObject request) {
         for (Connection c : control.getConnections()) {
             if (c.getSocket().getInetAddress() != src.getSocket().getInetAddress()
                     && c.getName().equals(Connection.SERVER)) {
-                c.writeMsg(request.toJSONString());
+                c.writeMsg(request.toString());
             }
         }
     }
 
-//    set up message queue for specific user and return username
-    private String updateMessageQueue(JSONObject msg) {
-        String username = (String) msg.get("username");
-        Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<JSONObject>());
+    //    set up message queue for specific user and return username
+    private String updateMessageQueue(JsonObject msg) {
+        String username = msg.get("username").getAsString();
+        Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<>());
         Constant.messageQueue.get(username).offer(msg);
         return username;
     }
 
 
-//    clean message queue for specific user
+    //    clean message queue for specific user
     private void clientBroadcastFromQueue(String username) {
-        while(!Constant.messageQueue.get(username).isEmpty()) {
-            JSONObject broadcastAct = Constant.messageQueue.get(username).poll();
+        while (!Constant.messageQueue.get(username).isEmpty()) {
+            JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
 
-            for (Connection c: Control.getInstance().getConnections()) {
+            for (Connection c : Control.getInstance().getConnections()) {
                 if (!c.getName().equals(Connection.SERVER) && c.isLoggedIn()) {
-                    c.writeMsg(broadcastAct.toJSONString());
+                    c.writeMsg(broadcastAct.toString());
                 }
             }
         }
