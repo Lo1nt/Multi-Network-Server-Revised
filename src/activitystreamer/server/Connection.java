@@ -11,6 +11,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Connection extends Thread {
 
@@ -28,7 +32,6 @@ public class Connection extends Thread {
     private boolean isLoggedIn = false;
 
     public static final String SERVER = "SERVER";
-
 
     public Connection(Socket s) throws IOException {
         dis = new DataInputStream(s.getInputStream());
@@ -51,7 +54,7 @@ public class Connection extends Thread {
 
     public void closeCon() {
         if (open) {
-            log.info("closing connection by closeCon" + Settings.socketAddress(socket));
+            log.info("closing connection by closeCon " + Settings.socketAddress(socket));
             try {
                 term = true;
                 br.close();
@@ -112,4 +115,17 @@ public class Connection extends Thread {
     public void setAuthenticated(boolean authenticated) {
         isAuthenticated = authenticated;
     }
+
+    private Control control = Control.getInstance();
+
+    public List<Connection> getNeighbors() {
+        List<Connection> connections = new ArrayList<>();
+        for (Connection c : control.getConnections()) {
+            if (c.getName().equals(Connection.SERVER)) {
+                connections.add(c);
+            }
+        }
+        return connections;
+    }
+
 }

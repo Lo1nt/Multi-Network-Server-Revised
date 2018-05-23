@@ -5,9 +5,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import org.json.simple.JSONObject;
 
-import javax.swing.text.html.parser.Parser;
+import java.util.List;
 import java.util.Map;
 
 public class Message {
@@ -29,94 +28,98 @@ public class Message {
     public static final String LOCK_DENIED = "LOCK_DENIED";
     public static final String LOCK_ALLOWED = "LOCK_ALLOWED";
     public static final String SYNCHRONIZE_USER = "SYNCHRONIZE_USER";
+    public static final String NEIGHBOR_ANNOUNCE = "NEIGHBOR_ANNOUNCE";
 
     public synchronized static boolean synchronizeUser(Connection con, Map<String, User> users) {
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.SYNCHRONIZE_USER);
         Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
         json.add("users", new JsonParser().parse(gson.toJson(users)).getAsJsonObject());
-        con.writeMsg(json.toString());
+        con.writeMsg(new Gson().toJson(json));
         return false;
     }
 
     public synchronized static boolean invalidMsg(Connection con, String info) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.INVALID_MESSAGE);
-        json.put("info", info);
-        con.writeMsg(json.toJSONString());
-//        System.out.println("invalid msg so I closed");
-        con.closeCon();
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.INVALID_MESSAGE);
+        json.addProperty("info", info);
+        con.writeMsg(new Gson().toJson(json));
         return true;
     }
 
     public synchronized static void authenticate(Connection con) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.AUTHENTICATE);
-        json.put("secret", Settings.getServerSecret());
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.AUTHENTICATE);
+        json.addProperty("secret", Settings.getServerSecret());
+        con.writeMsg(new Gson().toJson(json));
     }
 
     public synchronized static boolean authenticationFail(Connection con, String info) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.AUTHENTICATION_FAIL);
-        json.put("info", info);
-        con.writeMsg(json.toJSONString());
-//        System.out.println("authenticationFail so I closed");
-        con.closeCon();
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.AUTHENTICATION_FAIL);
+        json.addProperty("info", info);
+        con.writeMsg(new Gson().toJson(json));
         return true;
     }
 
+    public static void neighborAnnounce(Connection con, Map<Connection, List<Connection>> neighbors) {
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.NEIGHBOR_ANNOUNCE);
+        Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
+        json.add("neighbors", new JsonParser().parse(gson.toJson(neighbors)).getAsJsonObject());
+        con.writeMsg(new Gson().toJson(json));
+    }
+
     public synchronized static void serverAnnounce(Connection con, int load) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.SERVER_ANNOUNCE);
-        json.put("id", Settings.getServerId());
-        json.put("load", load);
-        json.put("hostname", Settings.getLocalHostname());
-        json.put("port", Settings.getLocalPort());
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.SERVER_ANNOUNCE);
+        json.addProperty("id", Settings.getServerId());
+        json.addProperty("load", load);
+        json.addProperty("hostname", Settings.getLocalHostname());
+        json.addProperty("port", Settings.getLocalPort());
+        con.writeMsg(new Gson().toJson(json));
     }
 
     public synchronized static boolean lockRequest(Connection con, String username, String secret) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.LOCK_REQUEST);
-        json.put("username", username);
-        json.put("secret", secret);
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.LOCK_REQUEST);
+        json.addProperty("username", username);
+        json.addProperty("secret", secret);
+        con.writeMsg(new Gson().toJson(json));
         return false;
     }
 
     public synchronized static boolean lockDenied(Connection con, String username, String secret) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.LOCK_DENIED);
-        json.put("username", username);
-        json.put("secret", secret);
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.LOCK_DENIED);
+        json.addProperty("username", username);
+        json.addProperty("secret", secret);
+        con.writeMsg(new Gson().toJson(json));
         return false;
     }
 
     public synchronized static boolean lockAllowed(Connection con, String username, String secret) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.LOCK_ALLOWED);
-        json.put("username", username);
-        json.put("secret", secret);
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.LOCK_ALLOWED);
+        json.addProperty("username", username);
+        json.addProperty("secret", secret);
+        con.writeMsg(new Gson().toJson(json));
         return false;
     }
 
     public synchronized static boolean registerFailed(Connection con, String info) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.REGISTER_FAILED);
-        json.put("info", info);
-        con.writeMsg(json.toJSONString());
-//        System.out.println("register failed so I closed");
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.REGISTER_FAILED);
+        json.addProperty("info", info);
+        con.writeMsg(new Gson().toJson(json));
         return true;
     }
 
     public synchronized static boolean registerSuccess(Connection con, String info) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.REGISTER_SUCCESS);
-        json.put("info", info);
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.REGISTER_SUCCESS);
+        json.addProperty("info", info);
+        con.writeMsg(new Gson().toJson(json));
         return false;
     }
 
@@ -128,11 +131,11 @@ public class Message {
      * @return
      */
     public synchronized static String register(String userName, String secret) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.REGISTER);
-        json.put("username", userName);
-        json.put("secret", secret);
-        return json.toJSONString();
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.REGISTER);
+        json.addProperty("username", userName);
+        json.addProperty("secret", secret);
+        return new Gson().toJson(json);
     }
 
     /**
@@ -144,12 +147,12 @@ public class Message {
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.LOGIN);
         json.addProperty("username", Settings.getUsername());
-        return json.toString();
+        return new Gson().toJson(json);
 
-//        JSONObject json = new JSONObject();
-//        json.put("command", Message.LOGIN);
-//        json.put("username", Settings.getUsername());
-//        return json.toJSONString();
+//        JsonObject json = new JsonObject();
+//        json.addProperty("command", Message.LOGIN);
+//        json.addProperty("username", Settings.getUsername());
+//        return json.toString();
     }
 
     /**
@@ -159,67 +162,66 @@ public class Message {
      * @return
      */
     public synchronized static String login(String userName) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.LOGIN);
-        json.put("username", userName);
-        json.put("secret", Settings.getUserSecret());
-        return json.toJSONString();
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.LOGIN);
+        json.addProperty("username", userName);
+        json.addProperty("secret", Settings.getUserSecret());
+        return new Gson().toJson(json);
     }
 
     public synchronized static boolean loginSuccess(Connection con, String info) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.LOGIN_SUCCESS);
-        json.put("info", info);
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.LOGIN_SUCCESS);
+        json.addProperty("info", info);
+        con.writeMsg(new Gson().toJson(json));
         return false;
     }
 
     public synchronized static boolean loginFailed(Connection con, String info) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.LOGIN_FAILED);
-        json.put("info", info);
-        con.writeMsg(json.toJSONString());
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.LOGIN_FAILED);
+        json.addProperty("info", info);
+        con.writeMsg(new Gson().toJson(json));
         return true;
     }
 
     public synchronized static boolean redirect(Connection con, String hostname, String port) {
-        JSONObject json = new JSONObject();
-        json.put("command", Message.REDIRECT);
-//        String[] stringArr = address.split(":");
-        json.put("hostname", hostname);
-        json.put("port", Integer.parseInt(port));
-        con.writeMsg(json.toJSONString());
-//        System.out.println("redirect so I closed");
-        con.closeCon();
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.REDIRECT);
+        json.addProperty("hostname", hostname);
+        json.addProperty("port", Integer.parseInt(port));
+        con.writeMsg(new Gson().toJson(json));
         return true;
     }
 
-    public synchronized static boolean activityBroadcast(Connection con, JSONObject activity) {
-        con.writeMsg(activity.toJSONString());
+    public synchronized static boolean activityBroadcast(Connection con, JsonObject activity) {
+        con.writeMsg(new Gson().toJson(activity));
         return false;
     }
 
-    public static JSONObject connCloseMsg() {
-        JSONObject json = new JSONObject();
+    public static JsonObject connCloseMsg() {
+        JsonObject json = new JsonObject();
         StringBuilder sb = new StringBuilder();
         sb.append("connection closed to /")
                 .append(Settings.getRemoteHostname())
                 .append(":")
                 .append(Settings.getRemotePort())
                 .append(", please restart new connection");
-        json.put("info", sb.toString());
+        json.addProperty("info", sb.toString());
         return json;
     }
 
-    public static JSONObject redirectMsg() {
-        JSONObject json = new JSONObject();
+    public static JsonObject redirectMsg() {
+        JsonObject json = new JsonObject();
         StringBuilder sb = new StringBuilder();
         sb.append("Start new connection to /");
         sb.append(Settings.getRemoteHostname())
                 .append(":")
                 .append(Settings.getRemotePort())
                 .append(", please wait");
-        json.put("info", sb.toString());
+        json.addProperty("info", sb.toString());
         return json;
     }
+
+
 }
