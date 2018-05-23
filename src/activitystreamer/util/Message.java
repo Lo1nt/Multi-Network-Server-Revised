@@ -195,7 +195,6 @@ public class Message {
     }
 
     public synchronized static boolean activityBroadcast(Connection con, JSONObject activity) {
-
         con.writeMsg(activity.toJSONString());
         return false;
     }

@@ -11,6 +11,7 @@ import org.json.simple.JSONObject;
 import java.net.InetAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
@@ -58,7 +59,7 @@ public class ControlHelper {
             case Message.ACTIVITY_MESSAGE:
                 return onReceiveActivityMessage(con, request);
             case Message.ACTIVITY_BROADCAST:
-                return activityBroadcast(con, request);
+                return onReceiveActivityBroadcast(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);
             case Message.SYNCHRONIZE_USER:
@@ -239,16 +240,6 @@ public class ControlHelper {
     }
 
 
-    private boolean activityBroadcast(Connection con, JSONObject msg) {
-        for (Connection c : control.getConnections()) {
-            if (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
-                    && (c.getName().equals(Connection.SERVER) || !c.getName().equals(Connection.SERVER) && c.isLoggedIn())) {
-                c.writeMsg(msg.toJSONString());
-            }
-        }
-        return false;
-    }
-
     private boolean onReceiveServerAnnounce(Connection con, JSONObject request) {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
@@ -325,13 +316,43 @@ public class ControlHelper {
         broadcastAct.put("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.put("activity", activity);
 
+//        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
+        relayMessage(con, broadcastAct);
+
+        username = updateMessageQueue(request);
+        clientBroadcastFromQueue(username);
+        
+        /*
         for (Connection c : control.getConnections()) {
             if (c.getName().equals(Connection.SERVER) || c.isLoggedIn()) {
                 Message.activityBroadcast(c, broadcastAct);
             }
         }
+        */
         return false;
 
+    }
+
+
+    private boolean onReceiveActivityBroadcast(Connection con, JSONObject msg) {
+
+//      continue pass this ACTIVITY_BROADCAST to other server
+        relayMessage(con, msg);
+
+
+        String username = updateMessageQueue(msg);
+
+        clientBroadcastFromQueue(username);
+
+      /*
+      for (Connection c : control.getConnections()) {
+          if ( (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
+                  && (c.getName().equals(Connection.SERVER)) || (!c.getName().equals(Connection.SERVER) && c.isLoggedIn())) ) {
+              c.writeMsg(msg.toJSONString());
+          }
+      }
+      */
+        return false;
     }
 
     /**
@@ -347,6 +368,29 @@ public class ControlHelper {
                 c.writeMsg(request.toJSONString());
             }
         }
+    }
+
+//    set up message queue for specific user and return username
+    private String updateMessageQueue(JSONObject msg) {
+        String username = (String) msg.get("username");
+        Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<JSONObject>());
+        Constant.messageQueue.get(username).offer(msg);
+        return username;
+    }
+
+
+//    clean message queue for specific user
+    private void clientBroadcastFromQueue(String username) {
+        while(!Constant.messageQueue.get(username).isEmpty()) {
+            JSONObject broadcastAct = Constant.messageQueue.get(username).poll();
+
+            for (Connection c: Control.getInstance().getConnections()) {
+                if (!c.getName().equals(Connection.SERVER) && c.isLoggedIn()) {
+                    c.writeMsg(broadcastAct.toJSONString());
+                }
+            }
+        }
+
     }
 
 }

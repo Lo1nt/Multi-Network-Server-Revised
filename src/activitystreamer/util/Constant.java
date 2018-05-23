@@ -14,7 +14,6 @@ public class Constant {
     public static Integer serverID = 10000;
     public static Integer clientID = 10001;
 
-    public static Map<String, ArrayList<Connection>> sendReceive = new HashMap<String, ArrayList<Connection>>();
-    public static Map<Connection, ConcurrentLinkedQueue<JSONObject>> messageQueue = new HashMap<Connection, ConcurrentLinkedQueue<JSONObject>>();
+    public static Map<String, ConcurrentLinkedQueue<JSONObject>> messageQueue = new HashMap<String, ConcurrentLinkedQueue<JSONObject>>();
     
 }
