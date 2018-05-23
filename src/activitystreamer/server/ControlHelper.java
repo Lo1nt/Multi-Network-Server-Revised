@@ -268,11 +268,12 @@ public class ControlHelper {
         JSONObject broadcastAct = new JSONObject();
         broadcastAct.put("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.put("activity", activity);
+        
 
 //        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
         serverBroadcast(con, broadcastAct);
         
-        username = updateMessageQueue(request);
+        username = updateMessageQueue(broadcastAct);
         clientBroadcastFromQueue(username);
         
         /*
