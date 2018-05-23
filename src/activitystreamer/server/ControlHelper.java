@@ -97,7 +97,7 @@ public class ControlHelper {
 
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
-        Constant.clientID -= 2;              // TODO check
+        Constant.clientID -= 2;
         return false;
     }
 
@@ -155,7 +155,6 @@ public class ControlHelper {
         String secret = (String) request.get("secret");
 
         lockRequestMap.put(username, con);
-        log.debug(username + ": " + lockRequestMap.get(username));
 
         if (control.getLocalRegisteredUsers().containsKey(username)) { // locally DENIED
             // 对连接它的servers发送LOCK_DENIED
@@ -165,16 +164,12 @@ public class ControlHelper {
                 }
             }
         } else { // locally ALLOWED
-            control.addExternalRegisteredUser(username, secret); // 暂时把user信息加入到externalUsers里
+            // 暂时把user信息加入到externalUsers里
+            control.addExternalRegisteredUser(username, secret);
 
-            relayMessage(con, request); // 转发LOCK_REQUEST给其他server（除了消息来源的server）
-            // TODO BUG
-//            // 对连接它的servers发送LOCK_ALLOWED
-//            for (Connection c : control.getConnections()) {
-//                if (c.getName().equals(Connection.SERVER)) {
-//                    return Message.lockAllowed(con, username, secret);
-//                }
-//            }
+            // 转发LOCK_REQUEST给其他server（除了消息来源的server）
+            relayMessage(con, request);
+
             // 只对con(LOCK_REQUEST的来源)发送LOCK_ALLOWED
             return Message.lockAllowed(con, username, secret);
         }
@@ -182,7 +177,6 @@ public class ControlHelper {
     }
 
 
-    // TODO BUG: 当一个server连接2个或以上server时，注册无效
     private boolean onLockAllowed(Connection con, JSONObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
@@ -193,8 +187,9 @@ public class ControlHelper {
             count = lockAllowedCount.get(username);
         }
         lockAllowedCount.put(username, ++count); // 本地对应的LOCK_ALLOWED计数 += 1
-        log.debug("LOCK_ALLOWED count: " + lockAllowedCount.get(username));
-        // 如果收到了所有server发来的LOCK_ALLOWED，注册成功 TODO: BUG
+
+        // 如果是register所在server
+        // 如果收到了所有server发来的LOCK_ALLOWED，注册成功
         if (serverList.size() == lockAllowedCount.get(username)) {
             for (JSONObject key : control.getToBeRegisteredUsers().keySet()) {
                 Connection c = control.getToBeRegisteredUsers().get(key);
@@ -205,9 +200,8 @@ public class ControlHelper {
                 }
             }
         }
-        // TODO BUG
-//        relayMessage(con, request);
 
+        // 如果是中继server
         // 只对LOCK_REQUEST的来源转发LOCK_ALLOWED
         if (lockRequestMap.get(username) != null) {
             Connection src = lockRequestMap.get(username);
@@ -223,11 +217,9 @@ public class ControlHelper {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = (String) request.get("username");
-        // 如果接收到LOCK_DENIED, 就把本地存储的externalUsers对应的username清空
-        if (control.getExternalRegisteredUsers().containsKey(username)) {
-            control.getExternalRegisteredUsers().remove(username);
-        }
-        // 如果本地toBeRegisteredUsers包含了该username（即本地注册的user），清空之，并向它发送REGISTER_FAILED
+
+        // 如果是register所在server:
+        // 清空toBeRegisteredUsers对应的username，并向它发送REGISTER_FAILED
         for (Map.Entry<JSONObject, Connection> entry : control.getToBeRegisteredUsers().entrySet()) {
             if (username.equals(entry.getKey().get("username"))) {
                 Connection c = entry.getValue();
@@ -236,7 +228,12 @@ public class ControlHelper {
                 Message.registerFailed(c, username + " is already registered with the system"); // true
             }
         }
-        // 将消息转发给其他server（除了来源server）
+        // 如果是中继server:
+        // 把本地存储的externalUsers对应的username清空
+        if (control.getExternalRegisteredUsers().containsKey(username)) {
+            control.getExternalRegisteredUsers().remove(username);
+        }
+        // 将LOCK_DENIED转发给其他server（除了来源server）用以清空externalRegisteredUsers中对应的username
         relayMessage(con, request);
         return false;
     }
