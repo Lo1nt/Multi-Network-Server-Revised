@@ -1,8 +1,14 @@
 package activitystreamer.util;
 
 import activitystreamer.server.Connection;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.json.simple.JSONObject;
+
+import javax.swing.text.html.parser.Parser;
+import java.util.Map;
 
 public class Message {
     public static final String AUTHENTICATE = "AUTHENTICATE";
@@ -22,6 +28,16 @@ public class Message {
     public static final String LOCK_REQUEST = "LOCK_REQUEST";
     public static final String LOCK_DENIED = "LOCK_DENIED";
     public static final String LOCK_ALLOWED = "LOCK_ALLOWED";
+    public static final String SYNCHRONIZE_USER = "SYNCHRONIZE_USER";
+
+    public synchronized static boolean synchronizeUser(Connection con, Map<String, User> users) {
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.SYNCHRONIZE_USER);
+        Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
+        json.add("users", new JsonParser().parse(gson.toJson(users)).getAsJsonObject());
+        con.writeMsg(json.toString());
+        return false;
+    }
 
     public synchronized static boolean invalidMsg(Connection con, String info) {
         JSONObject json = new JSONObject();

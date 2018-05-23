@@ -1,8 +1,9 @@
 package activitystreamer.util;
 
+import java.io.Serializable;
 import java.net.SocketAddress;
 
-public class User {
+public class User implements Serializable {
     private SocketAddress localSocketAddress;
     private String userName;
     private String secret;

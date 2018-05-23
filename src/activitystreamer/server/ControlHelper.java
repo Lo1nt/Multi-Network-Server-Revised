@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.simple.JSONObject;
 
+import java.net.InetAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -15,11 +16,17 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
     private static ControlHelper controlHelper = null;
-    private Control control = Control.getInstance();
-    private static Map<String, JSONObject> serverList = new ConcurrentHashMap<>();
-    private static Map<String, Integer> lockAllowedCount = new ConcurrentHashMap<>();
+    private Control control;
+    private static Map<String, JSONObject> serverList; // all external servers
+    private static Map<String, Integer> lockAllowedCount;
+
+    private static Map<String, Connection> lockRequestMap; // username, source port
 
     private ControlHelper() {
+        control = Control.getInstance();
+        serverList = new ConcurrentHashMap<>();
+        lockAllowedCount = new ConcurrentHashMap<>();
+        lockRequestMap = new ConcurrentHashMap<>();
     }
 
     public static ControlHelper getInstance() {
@@ -55,9 +62,16 @@ public class ControlHelper {
                 return onReceiveActivityBroadcast(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);
+            case Message.SYNCHRONIZE_USER:
+                return synchronizeUser(request);
             default:
-                return Message.invalidMsg(con, "unknown message");
+                return false;
         }
+    }
+
+    private boolean synchronizeUser(JSONObject request) {
+        log.debug(request.toJSONString());
+        return false;
     }
 
     private boolean authenticate(Connection con, JSONObject request) {
@@ -76,9 +90,15 @@ public class ControlHelper {
         // No reply if the authentication succeeded.
         con.setName(Connection.SERVER);
 
+        // synchronize all registered users to the new server
+        Map<String, User> externalUsers = new ConcurrentHashMap<>();
+        externalUsers.putAll(control.getLocalRegisteredUsers());
+        externalUsers.putAll(control.getExternalRegisteredUsers());
+        Message.synchronizeUser(con, externalUsers);
+
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
-        Constant.clientID -= 2;              // TODO check
+        Constant.clientID -= 2;
         return false;
     }
 
@@ -89,6 +109,7 @@ public class ControlHelper {
 
 
     private boolean register(Connection con, JSONObject request) {
+        log.debug(control.getConnections());
         if (!request.containsKey("username") || !request.containsKey("secret")) {
             Message.invalidMsg(con, "The message is incorrect");
             return true;
@@ -96,18 +117,19 @@ public class ControlHelper {
 
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
-        if (control.getRegisteredUsers().containsKey(username) || control.getExternalRegisteredUsers().containsKey(username)) {
+        if (control.getLocalRegisteredUsers().containsKey(username) || control.getExternalRegisteredUsers().containsKey(username)) {
             return Message.registerFailed(con, username + " is already registered with the system"); // true
         } else {
             control.addToBeRegisteredUser(request, con);
             lockAllowedCount.put(username, 0);
             if (serverList.size() == 0) { // if single server in the system
-                control.addRegisteredUser(username, secret);
+                control.addLocalRegisteredUser(username, secret);
                 return Message.registerSuccess(con, "register success for " + username);
             }
+            // relayMessage LOCK_REQUEST to all servers it connects
             for (Connection c : control.getConnections()) {
                 if (c.getName().equals(Connection.SERVER)) {
-                    return Message.lockRequest(c, username, secret);
+                    Message.lockRequest(c, username, secret);
                 }
             }
         }
@@ -118,7 +140,14 @@ public class ControlHelper {
         return false;
     }
 
-
+    /**
+     * Check local registered users list.
+     * If username exists, LOCK_DENIED; else, LOCK_ALLOWED
+     *
+     * @param con
+     * @param request
+     * @return
+     */
     private boolean onLockRequest(Connection con, JSONObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
@@ -126,20 +155,24 @@ public class ControlHelper {
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
 
-        if (control.getRegisteredUsers().containsKey(username)) { // DENIED
+        lockRequestMap.put(username, con);
+
+        if (control.getLocalRegisteredUsers().containsKey(username)) { // locally DENIED
+            // 对连接它的servers发送LOCK_DENIED
             for (Connection c : control.getConnections()) {
                 if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockDenied(con, username, secret);
                 }
             }
-        } else { // ALLOWED
-            serverBroadcast(con, request);
+        } else { // locally ALLOWED
+            // 暂时把user信息加入到externalUsers里
             control.addExternalRegisteredUser(username, secret);
-            for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Connection.SERVER)) {
-                    return Message.lockAllowed(con, username, secret);
-                }
-            }
+
+            // 转发LOCK_REQUEST给其他server（除了消息来源的server）
+            relayMessage(con, request);
+
+            // 只对con(LOCK_REQUEST的来源)发送LOCK_ALLOWED
+            return Message.lockAllowed(con, username, secret);
         }
         return false;
     }
@@ -154,19 +187,28 @@ public class ControlHelper {
         if (lockAllowedCount.get(username) != null) {
             count = lockAllowedCount.get(username);
         }
-        lockAllowedCount.put(username, ++count);
+        lockAllowedCount.put(username, ++count); // 本地对应的LOCK_ALLOWED计数 += 1
+
+        // 如果是register所在server
+        // 如果收到了所有server发来的LOCK_ALLOWED，注册成功
         if (serverList.size() == lockAllowedCount.get(username)) {
             for (JSONObject key : control.getToBeRegisteredUsers().keySet()) {
                 Connection c = control.getToBeRegisteredUsers().get(key);
                 if (c != null && username.equals(key.get("username"))) {
                     lockAllowedCount.remove(username);
-                    control.addRegisteredUser(username, (String) key.get("secret"));
+                    control.addLocalRegisteredUser(username, (String) key.get("secret"));
                     return Message.registerSuccess(c, "register success for " + username);
                 }
             }
         }
 
-        serverBroadcast(con, request);
+        // 如果是中继server
+        // 只对LOCK_REQUEST的来源转发LOCK_ALLOWED
+        if (lockRequestMap.get(username) != null) {
+            Connection src = lockRequestMap.get(username);
+            src.writeMsg(request.toJSONString());
+        }
+
         return false;
     }
 
@@ -176,9 +218,9 @@ public class ControlHelper {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = (String) request.get("username");
-        if (control.getExternalRegisteredUsers().containsKey(username)) {
-            control.getExternalRegisteredUsers().remove(username);
-        }
+
+        // 如果是register所在server:
+        // 清空toBeRegisteredUsers对应的username，并向它发送REGISTER_FAILED
         for (Map.Entry<JSONObject, Connection> entry : control.getToBeRegisteredUsers().entrySet()) {
             if (username.equals(entry.getKey().get("username"))) {
                 Connection c = entry.getValue();
@@ -187,7 +229,13 @@ public class ControlHelper {
                 Message.registerFailed(c, username + " is already registered with the system"); // true
             }
         }
-        serverBroadcast(con, request);
+        // 如果是中继server:
+        // 把本地存储的externalUsers对应的username清空
+        if (control.getExternalRegisteredUsers().containsKey(username)) {
+            control.getExternalRegisteredUsers().remove(username);
+        }
+        // 将LOCK_DENIED转发给其他server（除了来源server）用以清空externalRegisteredUsers中对应的username
+        relayMessage(con, request);
         return false;
     }
 
@@ -197,8 +245,7 @@ public class ControlHelper {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
         serverList.put((String) request.get("id"), request);
-//        log.info(request.get("port") + " load: " + request.get("load"));
-        serverBroadcast(con, request);
+        relayMessage(con, request);
         return false;
 
     }
@@ -211,7 +258,7 @@ public class ControlHelper {
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
 
-        Map<String, User> registeredUsers = control.getRegisteredUsers();
+        Map<String, User> registeredUsers = control.getLocalRegisteredUsers();
         Map<String, User> externalRegisteredUsers = control.getExternalRegisteredUsers();
         if (username.equals("anonymous")
                 || registeredUsers.containsKey(username) && registeredUsers.get(username).getSecret().equals(secret)
@@ -219,8 +266,8 @@ public class ControlHelper {
             con.setLoggedIn(true);
             Message.loginSuccess(con, "logged in as user " + request.get("username"));
             for (String key : serverList.keySet()) {
-                log.warn(control.getLoad() + " : " + serverList.get(key).get("load"));
                 if (key != null && control.getLoad() - ((Long) serverList.get(key).get("load")).intValue() >= 2) {
+                    log.debug("REDIRECT!!!" + serverList.get(key).get("port"));
                     return Message.redirect(con, (String) serverList.get(key).get("hostname"), "" + serverList.get(key).get("port"));
                 }
             }
@@ -259,7 +306,7 @@ public class ControlHelper {
 
         if (!con.isLoggedIn()) {
             return Message.authenticationFail(con, "the user has not logged in yet");
-        } else if (!(control.getRegisteredUsers().containsKey(username) && control.getRegisteredUsers().get(username).getSecret().equals(secret)) &&
+        } else if (!(control.getLocalRegisteredUsers().containsKey(username) && control.getLocalRegisteredUsers().get(username).getSecret().equals(secret)) &&
                 !(control.getExternalRegisteredUsers().containsKey(username) && control.getExternalRegisteredUsers().get(username).getSecret().equals(secret))) {
             // if user is neither registered locally or externally
             return Message.authenticationFail(con, "the username and secret do not match the logged in the user");
@@ -271,9 +318,11 @@ public class ControlHelper {
         
 
 //        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
-        serverBroadcast(con, broadcastAct);
+
         
+        relayMessage(con, broadcastAct);
         username = updateMessageQueue(broadcastAct);
+
         clientBroadcastFromQueue(username);
         
         /*
@@ -287,16 +336,16 @@ public class ControlHelper {
 
     }
 
-    
+
     private boolean onReceiveActivityBroadcast(Connection con, JSONObject msg) {
-        
+
 //      continue pass this ACTIVITY_BROADCAST to other server
-      serverBroadcast(con, msg);
-      
-      
-      String username = updateMessageQueue(msg);
-      
-      clientBroadcastFromQueue(username);
+        relayMessage(con, msg);
+
+
+        String username = updateMessageQueue(msg);
+
+        clientBroadcastFromQueue(username);
 
       /*
       for (Connection c : control.getConnections()) {
@@ -306,20 +355,24 @@ public class ControlHelper {
           }
       }
       */
-      return false;
-  }
-    
-    
-//    pass info to servers except server who sends request to this
-    private void serverBroadcast(Connection con, JSONObject request) {
+        return false;
+    }
+
+    /**
+     * Relay message to all servers it connects EXCEPT source server
+     *
+     * @param src
+     * @param request
+     */
+    private void relayMessage(Connection src, JSONObject request) {
         for (Connection c : control.getConnections()) {
-            if (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
+            if (c.getSocket().getInetAddress() != src.getSocket().getInetAddress()
                     && c.getName().equals(Connection.SERVER)) {
                 c.writeMsg(request.toJSONString());
             }
         }
     }
-    
+
 //    set up message queue for specific user and return username
     private String updateMessageQueue(JSONObject msg) {
         String username = (String) msg.get("username");
@@ -327,20 +380,20 @@ public class ControlHelper {
         Constant.messageQueue.get(username).offer(msg);
         return username;
     }
-    
-    
+
+
 //    clean message queue for specific user
     private void clientBroadcastFromQueue(String username) {
         while(!Constant.messageQueue.get(username).isEmpty()) {
             JSONObject broadcastAct = Constant.messageQueue.get(username).poll();
-            
+
             for (Connection c: Control.getInstance().getConnections()) {
                 if (!c.getName().equals(Connection.SERVER) && c.isLoggedIn()) {
                     c.writeMsg(broadcastAct.toJSONString());
                 }
             }
         }
-        
+
     }
 
 }
