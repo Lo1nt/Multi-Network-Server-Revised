@@ -8,6 +8,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.json.simple.JSONObject;
 
+import java.net.InetAddress;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,13 +16,16 @@ public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
     private static ControlHelper controlHelper = null;
     private Control control;
-    private static Map<String, JSONObject> serverList;
+    private static Map<String, JSONObject> serverList; // all external servers
     private static Map<String, Integer> lockAllowedCount;
+
+    private static Map<String, Connection> lockRequestMap; // username, source port
 
     private ControlHelper() {
         control = Control.getInstance();
         serverList = new ConcurrentHashMap<>();
         lockAllowedCount = new ConcurrentHashMap<>();
+        lockRequestMap = new ConcurrentHashMap<>();
     }
 
     public static ControlHelper getInstance() {
@@ -104,6 +108,7 @@ public class ControlHelper {
 
 
     private boolean register(Connection con, JSONObject request) {
+        log.debug(control.getConnections());
         if (!request.containsKey("username") || !request.containsKey("secret")) {
             Message.invalidMsg(con, "The message is incorrect");
             return true;
@@ -120,9 +125,10 @@ public class ControlHelper {
                 control.addLocalRegisteredUser(username, secret);
                 return Message.registerSuccess(con, "register success for " + username);
             }
+            // relayMessage LOCK_REQUEST to all servers it connects
             for (Connection c : control.getConnections()) {
                 if (c.getName().equals(Connection.SERVER)) {
-                    return Message.lockRequest(c, username, secret);
+                    Message.lockRequest(c, username, secret);
                 }
             }
         }
@@ -133,7 +139,14 @@ public class ControlHelper {
         return false;
     }
 
-
+    /**
+     * Check local registered users list.
+     * If username exists, LOCK_DENIED; else, LOCK_ALLOWED
+     *
+     * @param con
+     * @param request
+     * @return
+     */
     private boolean onLockRequest(Connection con, JSONObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
@@ -141,25 +154,35 @@ public class ControlHelper {
         String username = (String) request.get("username");
         String secret = (String) request.get("secret");
 
-        if (control.getLocalRegisteredUsers().containsKey(username)) { // DENIED
+        lockRequestMap.put(username, con);
+        log.debug(username + ": " + lockRequestMap.get(username));
+
+        if (control.getLocalRegisteredUsers().containsKey(username)) { // locally DENIED
+            // 对连接它的servers发送LOCK_DENIED
             for (Connection c : control.getConnections()) {
                 if (c.getName().equals(Connection.SERVER)) {
                     return Message.lockDenied(con, username, secret);
                 }
             }
-        } else { // ALLOWED
-            broadcast(con, request);
-            control.addExternalRegisteredUser(username, secret);
-            for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Connection.SERVER)) {
-                    return Message.lockAllowed(con, username, secret);
-                }
-            }
+        } else { // locally ALLOWED
+            control.addExternalRegisteredUser(username, secret); // 暂时把user信息加入到externalUsers里
+
+            relayMessage(con, request); // 转发LOCK_REQUEST给其他server（除了消息来源的server）
+            // TODO BUG
+//            // 对连接它的servers发送LOCK_ALLOWED
+//            for (Connection c : control.getConnections()) {
+//                if (c.getName().equals(Connection.SERVER)) {
+//                    return Message.lockAllowed(con, username, secret);
+//                }
+//            }
+            // 只对con(LOCK_REQUEST的来源)发送LOCK_ALLOWED
+            return Message.lockAllowed(con, username, secret);
         }
         return false;
     }
 
 
+    // TODO BUG: 当一个server连接2个或以上server时，注册无效
     private boolean onLockAllowed(Connection con, JSONObject request) {
         if (!con.getName().equals(Connection.SERVER)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
@@ -169,7 +192,9 @@ public class ControlHelper {
         if (lockAllowedCount.get(username) != null) {
             count = lockAllowedCount.get(username);
         }
-        lockAllowedCount.put(username, ++count);
+        lockAllowedCount.put(username, ++count); // 本地对应的LOCK_ALLOWED计数 += 1
+        log.debug("LOCK_ALLOWED count: " + lockAllowedCount.get(username));
+        // 如果收到了所有server发来的LOCK_ALLOWED，注册成功 TODO: BUG
         if (serverList.size() == lockAllowedCount.get(username)) {
             for (JSONObject key : control.getToBeRegisteredUsers().keySet()) {
                 Connection c = control.getToBeRegisteredUsers().get(key);
@@ -180,8 +205,15 @@ public class ControlHelper {
                 }
             }
         }
+        // TODO BUG
+//        relayMessage(con, request);
 
-        broadcast(con, request);
+        // 只对LOCK_REQUEST的来源转发LOCK_ALLOWED
+        if (lockRequestMap.get(username) != null) {
+            Connection src = lockRequestMap.get(username);
+            src.writeMsg(request.toJSONString());
+        }
+
         return false;
     }
 
@@ -191,9 +223,11 @@ public class ControlHelper {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = (String) request.get("username");
+        // 如果接收到LOCK_DENIED, 就把本地存储的externalUsers对应的username清空
         if (control.getExternalRegisteredUsers().containsKey(username)) {
             control.getExternalRegisteredUsers().remove(username);
         }
+        // 如果本地toBeRegisteredUsers包含了该username（即本地注册的user），清空之，并向它发送REGISTER_FAILED
         for (Map.Entry<JSONObject, Connection> entry : control.getToBeRegisteredUsers().entrySet()) {
             if (username.equals(entry.getKey().get("username"))) {
                 Connection c = entry.getValue();
@@ -202,7 +236,8 @@ public class ControlHelper {
                 Message.registerFailed(c, username + " is already registered with the system"); // true
             }
         }
-        broadcast(con, request);
+        // 将消息转发给其他server（除了来源server）
+        relayMessage(con, request);
         return false;
     }
 
@@ -222,8 +257,7 @@ public class ControlHelper {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
         serverList.put((String) request.get("id"), request);
-        log.info(request.get("port") + " load: " + request.get("load"));
-        broadcast(con, request);
+        relayMessage(con, request);
         return false;
 
     }
@@ -303,10 +337,15 @@ public class ControlHelper {
 
     }
 
-
-    private void broadcast(Connection con, JSONObject request) {
+    /**
+     * Relay message to all servers it connects EXCEPT source server
+     *
+     * @param src
+     * @param request
+     */
+    private void relayMessage(Connection src, JSONObject request) {
         for (Connection c : control.getConnections()) {
-            if (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
+            if (c.getSocket().getInetAddress() != src.getSocket().getInetAddress()
                     && c.getName().equals(Connection.SERVER)) {
                 c.writeMsg(request.toJSONString());
             }
