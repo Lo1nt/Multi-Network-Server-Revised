@@ -119,7 +119,6 @@ public class ClientSkeleton extends Thread {
      *
      * @param msg
      * @return JsonObject
-     * @throws ParseException
      * @throws IOException
      */
     private void process(String msg) throws IOException {

@@ -297,7 +297,6 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
-        log.debug(request.get("port") + ": " + request.get("load"));
         otherServers.put(request.get("id").getAsString(), request);
 //        lastAnnounceTimestamps.put((String) request.get("id"), System.currentTimeMillis()); // TODO CHECK: 将每个server的announce时间戳记录下来
         relayMessage(con, request);
@@ -319,10 +318,10 @@ public class ControlHelper {
                 || localRegisteredUsers.containsKey(username) && localRegisteredUsers.get(username).getSecret().equals(secret)
                 || externalRegisteredUsers.containsKey(username) && externalRegisteredUsers.get(username).getSecret().equals(secret)) {
             con.setLoggedIn(true);
-            Message.loginSuccess(con, "logged in as user " + request.get("username"));
+            Message.loginSuccess(con, "logged in as user " + request.get("username").getAsString());
             for (String key : otherServers.keySet()) {
                 if (key != null && control.getLoad() - ((Long) otherServers.get(key).get("load").getAsLong()).intValue() >= 2) {
-                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(), "" + otherServers.get(key).get("port"));
+                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(), "" + otherServers.get(key).get("port").getAsInt());
                 }
             }
             return false;
@@ -428,7 +427,8 @@ public class ControlHelper {
 
     //    set up message queue for specific user and return username
     private String updateMessageQueue(JsonObject msg) {
-        String username = msg.get("username").getAsString();
+//        String username = msg.get("username").getAsString();
+        String username = msg.get("activity").getAsJsonObject().get("authenticated_user").getAsString(); //TODO check json null
         Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<>());
         Constant.messageQueue.get(username).offer(msg);
         return username;
