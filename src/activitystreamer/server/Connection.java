@@ -24,7 +24,7 @@ public class Connection extends Thread {
     private boolean term = false;
 
     private Integer connID;
-    private boolean flag = false;
+    private boolean isAuthenticated = false;
     private boolean isLoggedIn = false;
 
     public static final String SERVER = "SERVER";
@@ -103,5 +103,13 @@ public class Connection extends Thread {
 
     public void setLoggedIn(boolean loggedIn) {
         isLoggedIn = loggedIn;
+    }
+
+    public boolean isAuthenticated() {
+        return isAuthenticated;
+    }
+
+    public void setAuthenticated(boolean authenticated) {
+        isAuthenticated = authenticated;
     }
 }

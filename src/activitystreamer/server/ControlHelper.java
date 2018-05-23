@@ -84,7 +84,7 @@ public class ControlHelper {
             return Message.authenticationFail(con, "the supplied secret is incorrect: " + secret);
         }
 // TODO
-//        else if (control.getConnections().contains(con)) {
+//        else if (control.getConnections().contains(con) ) {
 //            return Message.invalidMsg(con, "the server has already successfully authenticated");
 //        }
         // No reply if the authentication succeeded.
@@ -244,6 +244,8 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
+        // TODO
+        log.debug(request.get("port") + ": " + request.get("load"));
         serverList.put((String) request.get("id"), request);
         relayMessage(con, request);
         return false;
