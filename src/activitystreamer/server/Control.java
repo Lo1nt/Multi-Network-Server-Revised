@@ -5,15 +5,11 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import activitystreamer.util.Constant;
-import activitystreamer.util.Message;
-import activitystreamer.util.User;
+import activitystreamer.util.*;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import activitystreamer.util.Settings;
 
 public class Control extends Thread {
     private static final Logger log = LogManager.getLogger();
@@ -101,7 +97,30 @@ public class Control extends Thread {
         if (connections.contains(con)) {
             connections.remove(con);
         }
+
+        if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
+            con.setLoggedIn(false);
+        }
+
+        // If parent server crashes，then establish new connection to another server (the one with minimum port number)
+        if (con.getName().equals(Connection.PARENT)) {
+            Map<String, JsonObject> otherServers = ControlHelper.getInstance().getOtherServers();
+
+            // TODO there's a restriction: if the server with minimum port number crashes, then...
+            int newRemotePort = minPortOfSystem(otherServers);
+            if (newRemotePort != Settings.getLocalPort()) {
+                Settings.setRemotePort(newRemotePort);
+                initiateConnection();
+            }
+        }
+
     }
+
+    private int minPortOfSystem(Map<String, JsonObject> otherServers) {
+        String minPort = (String) CommonUtil.getMinKey(otherServers);
+        return Integer.parseInt(minPort);
+    }
+
 
     /**
      * A new incoming connection has been established, and a reference is returned
@@ -116,15 +135,13 @@ public class Control extends Thread {
         Connection c = new Connection(s);
         c.setConnID(Constant.clientID);
         c.setConnTime(System.currentTimeMillis());
-        Constant.clientID += 2;          // TODO
+        Constant.clientID += 2;
         connections.add(c);
         return c;
     }
 
     /**
-     * A new outgoing connection has been established, and a reference is returned
-     * to it. Only local server -> remote server remote server will be the parent of
-     * local server
+     * A new outgoing connection has been established, and a reference is returned to it.
      *
      * @param s
      * @return
@@ -133,7 +150,7 @@ public class Control extends Thread {
     public synchronized Connection outgoingConnection(Socket s) throws IOException {
         log.debug("outgoing connection: " + Settings.socketAddress(s));
         Connection c = new Connection(s);
-        c.setName(Connection.SERVER);
+        c.setName(Connection.PARENT);
         connections.add(c);
         Message.authenticate(c);
         return c;
@@ -143,6 +160,19 @@ public class Control extends Thread {
     public void run() {
         log.info("using activity interval of " + Settings.getActivityInterval() + " milliseconds");
         while (!term) {
+            load = 0;
+            for (Connection c : connections) {
+                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)) {
+                    load++;
+                }
+            }
+
+            for (Connection c : connections) {
+                if (c.isOpen() && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
+                    Message.serverAnnounce(c, load);
+                }
+            }
+
             // do something with 5 second intervals in between
             try {
                 Thread.sleep(Settings.getActivityInterval());
@@ -150,28 +180,6 @@ public class Control extends Thread {
                 log.info("received an interrupt, system is shutting down");
                 break;
             }
-
-            load = 0;
-            for (Connection c : connections) {
-                if (!c.getName().equals(Connection.SERVER)) {
-                    load++;
-                }
-            }
-            for (Connection c : connections) {
-                if (c.isOpen() && c.getName().equals(Connection.SERVER)) {
-                    Message.serverAnnounce(c, load);
-                }
-            }
-
-//            Map<Connection, List<Connection>> neighbors = new HashMap<>();
-//            for (Connection c : connections) {
-//                if (c.isOpen() && c.getName().equals(Connection.SERVER)) {
-//                    neighbors.put(c, c.getNeighbors());
-//                }
-//            }
-//            for (Connection c : connections) {
-//                Message.neighborAnnounce(c, neighbors);
-//            }
 
 
         }

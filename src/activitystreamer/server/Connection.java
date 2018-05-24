@@ -4,19 +4,10 @@ import activitystreamer.util.Settings;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
-public class Connection extends Thread {
+public class Connection extends Thread implements Serializable {
 
     private static final Logger log = LogManager.getLogger();
     private DataInputStream dis;
@@ -32,7 +23,10 @@ public class Connection extends Thread {
     private boolean isAuthenticated = false;
     private boolean isLoggedIn = false;
 
-    public static final String SERVER = "SERVER";
+    public static final String PARENT = "PARENT";
+    public static final String CHILD = "CHILD";
+
+    private Control control = Control.getInstance();
 
     public Connection(Socket s) throws IOException {
         dis = new DataInputStream(s.getInputStream());
@@ -124,16 +118,5 @@ public class Connection extends Thread {
         isAuthenticated = authenticated;
     }
 
-    private Control control = Control.getInstance();
-
-    public List<Connection> getNeighbors() {
-        List<Connection> connections = new ArrayList<>();
-        for (Connection c : control.getConnections()) {
-            if (c.getName().equals(Connection.SERVER)) {
-                connections.add(c);
-            }
-        }
-        return connections;
-    }
 
 }

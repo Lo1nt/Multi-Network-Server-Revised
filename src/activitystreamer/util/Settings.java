@@ -21,8 +21,9 @@ public class Settings {
 
     // server id.
     private static String serverId;
+
     // serverIdLength
-    private static int serverIdLength = 26;
+    private static final int RANDOM_LENGTH = 26;
     private static String serverSecret = "1";
 
     // for client
@@ -31,7 +32,7 @@ public class Settings {
 
     // set server id.
     public static void setServerId() {
-        serverId = genRandomString();
+        serverId = localPort + "";
     }
 
     // generate random String
@@ -40,7 +41,7 @@ public class Settings {
         Random rd = new Random();
         StringBuilder randomId = new StringBuilder();
         // randomId.length = 26
-        for (int i = 0; i < serverIdLength; i++) {
+        for (int i = 0; i < RANDOM_LENGTH; i++) {
             randomId.append(range.charAt(rd.nextInt(range.length())));
         }
         return randomId.toString();
