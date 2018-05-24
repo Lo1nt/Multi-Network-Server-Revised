@@ -101,6 +101,50 @@ public class Control extends Thread {
         if (connections.contains(con)) {
             connections.remove(con);
         }
+
+        if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
+            con.setLoggedIn(false);
+        }
+
+            // 原parent connection断了，则要与其他server建立新connection
+
+        if (con.getName().equals(Connection.PARENT)) {
+            Map<String, JsonObject> otherServers = ControlHelper.getInstance().getOtherServers();
+
+            // choose the server with minimum port number to reconnect
+            // TODO there's a restriction: if the server with minimum port number crashes, then...
+            int newRemotePort = minPortOfSystem(otherServers);
+            if (newRemotePort != Settings.getLocalPort()) {
+                Settings.setRemotePort(newRemotePort);
+                initiateConnection();
+            }
+        }
+
+    }
+
+    private int minPortOfSystem(Map<String, JsonObject> otherServers) {
+        String minPort = (String) getMinKey(otherServers);
+        return Integer.parseInt(minPort);
+    }
+
+    private Object getMinKey(Map<String, JsonObject> map) {
+        if (map == null) {
+            return null;
+        }
+        Set<String> set = map.keySet();
+        Object[] objs = set.toArray();
+        Arrays.sort(objs);
+        return objs[0];
+    }
+
+    public Object getMinValue(Map<Integer, Integer> map) {
+        if (map == null) {
+            return null;
+        }
+        Collection<Integer> c = map.values();
+        Object[] objs = c.toArray();
+        Arrays.sort(objs);
+        return objs[0];
     }
 
     /**
@@ -122,8 +166,7 @@ public class Control extends Thread {
 
     /**
      * A new outgoing connection has been established, and a reference is returned
-     * to it. Only local server -> remote server remote server will be the parent of
-     * local server
+     * to it.
      *
      * @param s
      * @return
@@ -132,7 +175,7 @@ public class Control extends Thread {
     public synchronized Connection outgoingConnection(Socket s) throws IOException {
         log.debug("outgoing connection: " + Settings.socketAddress(s));
         Connection c = new Connection(s);
-        c.setName(Connection.SERVER);
+        c.setName(Connection.PARENT);
         connections.add(c);
         Message.authenticate(c);
         return c;
@@ -143,34 +186,26 @@ public class Control extends Thread {
         log.info("using activity interval of " + Settings.getActivityInterval() + " milliseconds");
         while (!term) {
             // do something with 5 second intervals in between
+
+            load = 0;
+            for (Connection c : connections) {
+                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)) {
+                    load++;
+                }
+            }
+
+            for (Connection c : connections) {
+                if (c.isOpen() && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
+                    Message.serverAnnounce(c, load);
+                }
+            }
+
             try {
                 Thread.sleep(Settings.getActivityInterval());
             } catch (InterruptedException e) {
                 log.info("received an interrupt, system is shutting down");
                 break;
             }
-
-            load = 0;
-            for (Connection c : connections) {
-                if (!c.getName().equals(Connection.SERVER)) {
-                    load++;
-                }
-            }
-            for (Connection c : connections) {
-                if (c.isOpen() && c.getName().equals(Connection.SERVER)) {
-                    Message.serverAnnounce(c, load);
-                }
-            }
-
-//            Map<Connection, List<Connection>> neighbors = new HashMap<>();
-//            for (Connection c : connections) {
-//                if (c.isOpen() && c.getName().equals(Connection.SERVER)) {
-//                    neighbors.put(c, c.getNeighbors());
-//                }
-//            }
-//            for (Connection c : connections) {
-//                Message.neighborAnnounce(c, neighbors);
-//            }
 
 
         }

@@ -6,13 +6,13 @@ import activitystreamer.util.Settings;
 import activitystreamer.util.User;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.lang.reflect.Type;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -21,14 +21,14 @@ public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
     private static ControlHelper controlHelper = null;
     private Control control;
-    private Map<String, JsonObject> otherServers; // all external servers
     private Map<String, Integer> lockAllowedCount;
-
     private Map<String, Connection> lockRequestMap; // username, source port
+    private Map<String, JsonObject> otherServers; // all external servers
 
-//    private Map<String, Long> lastAnnounceTimestamps;
+    // the neighboring servers of neighboring servers, used for reconnection after some server crashes
+    private Map<Connection, JsonArray> neighborServers;
 
-    private Map<Connection, List<Connection>> neighbors;
+    private Map<String, Long> lastAnnounceTimestamps;
 
 
     private ControlHelper() {
@@ -36,30 +36,38 @@ public class ControlHelper {
         otherServers = new ConcurrentHashMap<>();
         lockAllowedCount = new ConcurrentHashMap<>();
         lockRequestMap = new ConcurrentHashMap<>();
-        neighbors = new ConcurrentHashMap<>();
+        neighborServers = new ConcurrentHashMap<>();
 
-//        lastAnnounceTimestamps = new ConcurrentHashMap<>();
+        lastAnnounceTimestamps = new ConcurrentHashMap<>();
 
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                while (true) {
-//                    try {
-//                        Thread.sleep(1000);
-//                    } catch (InterruptedException e) {
-//                        e.printStackTrace();
-//                    }
-//                    for (Map.Entry<String, Long> entry : lastAnnounceTimestamps.entrySet()) {
-//                        // 如果超过10秒钟没有收到announce，判定为超时，从server列表中移除
-//                        if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
-//                            otherServers.remove(entry.getKey());
-//                            lastAnnounceTimestamps.remove(entry.getKey());
-//                            log.debug(otherServers);
-//                        }
-//                    }
-//                }
-//            }
-//        }).start();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    for (Map.Entry<String, Long> entry : lastAnnounceTimestamps.entrySet()) {
+                        // 如果超过10秒钟没有收到announce，判定为超时，从server列表中移除
+                        if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
+                            otherServers.remove(entry.getKey());
+                            lastAnnounceTimestamps.remove(entry.getKey());
+
+                            // 从断掉server的neighbors中（除了自己）选出端口号最小的去连接
+                            // 如果neighbors中自己端口最小，就不做操作，等待别的server连入
+//                            Gson gson = new Gson();
+//                            JsonArray ja = neighborServers.get(entry.getKey()).getAsJsonArray();  // TODO!!!
+//                            List<Integer> portList = gson.fromJson(ja, new TypeToken<List<User>>() {
+//                            }.getType());
+//                            Collections.sort(portList);
+
+                        }
+                    }
+                }
+            }
+        }).start();
 
 
     }
@@ -99,22 +107,11 @@ public class ControlHelper {
                 return onReceiveServerAnnounce(con, request);
             case Message.SYNCHRONIZE_USER:
                 return synchronizeUser(request);
-            case Message.NEIGHBOR_ANNOUNCE:
-                return onReceiveNeighborAnnounce(request);
             default:
                 return false;
         }
     }
 
-    private boolean onReceiveNeighborAnnounce(JsonObject request) {
-        Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
-        JsonObject jo = (JsonObject) request.get("neighbors");
-        Type type = new TypeToken<Map<Connection, List<Connection>>>() {
-        }.getType();
-        neighbors = gson.fromJson(jo.getAsString(), type);
-        log.debug("neighbors === " + neighbors);
-        return false;
-    }
 
     private boolean synchronizeUser(JsonObject request) {
         Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
@@ -126,6 +123,7 @@ public class ControlHelper {
         log.debug("users === " + users);
         return false;
     }
+
 
     private boolean authenticate(Connection con, JsonObject request) {
         if (request.get("secret") == null) {
@@ -140,7 +138,7 @@ public class ControlHelper {
         }
         // No reply if the authentication succeeded.
         con.setAuthenticated(true);
-        con.setName(Connection.SERVER);
+        con.setName(Connection.CHILD);
 
         // synchronize all registered users to the new server
         Map<String, User> externalUsers = new ConcurrentHashMap<>();
@@ -157,6 +155,21 @@ public class ControlHelper {
 
     private boolean authenticationFail() {
         return true;
+    }
+
+
+    private boolean onReceiveServerAnnounce(Connection con, JsonObject request) {
+        if (request.get("id") == null) {
+            return Message.invalidMsg(con, "message doesn't contain a server id");
+        }
+        otherServers.put(request.get("id").getAsString(), request);
+        lastAnnounceTimestamps.put(request.get("id").getAsString(), System.currentTimeMillis()); // TODO CHECK: 将每个server的announce时间戳记录下来
+        relayMessage(con, request);
+
+//        log.debug(request.get("port").getAsInt());
+//        log.debug(otherServers);
+//        log.debug(lastAnnounceTimestamps);
+        return false;
     }
 
 
@@ -181,7 +194,7 @@ public class ControlHelper {
             }
             // relayMessage LOCK_REQUEST to all servers it connects
             for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Connection.SERVER)) {
+                if (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD)) {
                     Message.lockRequest(c, username, secret);
                 }
             }
@@ -202,7 +215,7 @@ public class ControlHelper {
      * @return
      */
     private boolean onLockRequest(Connection con, JsonObject request) {
-        if (!con.getName().equals(Connection.SERVER)) {
+        if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = request.get("username").getAsString();
@@ -213,7 +226,7 @@ public class ControlHelper {
         if (control.getLocalRegisteredUsers().containsKey(username)) { // locally DENIED
             // send LOCK_DENIED to its connected servers
             for (Connection c : control.getConnections()) {
-                if (c.getName().equals(Connection.SERVER)) {
+                if (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD)) {
                     return Message.lockDenied(con, username, secret);
                 }
             }
@@ -232,7 +245,7 @@ public class ControlHelper {
 
 
     private boolean onLockAllowed(Connection con, JsonObject request) {
-        if (!con.getName().equals(Connection.SERVER)) {
+        if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = request.get("username").getAsString();
@@ -267,7 +280,7 @@ public class ControlHelper {
 
 
     private boolean onLockDenied(Connection con, JsonObject request) {
-        if (!con.getName().equals(Connection.SERVER)) {
+        if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
         }
         String username = request.get("username").getAsString();
@@ -291,19 +304,6 @@ public class ControlHelper {
         relayMessage(con, request);
         return false;
     }
-
-
-    private boolean onReceiveServerAnnounce(Connection con, JsonObject request) {
-        if (request.get("id") == null) {
-            return Message.invalidMsg(con, "message doesn't contain a server id");
-        }
-        otherServers.put(request.get("id").getAsString(), request);
-//        lastAnnounceTimestamps.put((String) request.get("id"), System.currentTimeMillis()); // TODO CHECK: 将每个server的announce时间戳记录下来
-        relayMessage(con, request);
-        return false;
-
-    }
-
 
     private boolean login(Connection con, JsonObject request) {
         if (!request.has("username")) {
@@ -419,7 +419,7 @@ public class ControlHelper {
     private void relayMessage(Connection src, JsonObject request) {
         for (Connection c : control.getConnections()) {
             if (c.getSocket().getInetAddress() != src.getSocket().getInetAddress()
-                    && c.getName().equals(Connection.SERVER)) {
+                    && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
                 c.writeMsg(request.toString());
             }
         }
@@ -441,12 +441,24 @@ public class ControlHelper {
             JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
 
             for (Connection c : Control.getInstance().getConnections()) {
-                if (!c.getName().equals(Connection.SERVER) && c.isLoggedIn()) {
+                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD) && c.isLoggedIn()) {
                     c.writeMsg(broadcastAct.toString());
                 }
             }
         }
 
+    }
+
+//    public Map<Connection, JsonArray> getNeighborServers() {
+//        return neighborServers;
+//    }
+//
+//    public void setNeighborServers(Map<Connection, JsonArray> neighborServers) {
+//        this.neighborServers = neighborServers;
+//    }
+
+    public Map<String, JsonObject> getOtherServers() {
+        return otherServers;
     }
 
 }

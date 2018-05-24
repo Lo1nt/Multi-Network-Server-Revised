@@ -31,7 +31,7 @@ public class Settings {
 
     // set server id.
     public static void setServerId() {
-        serverId = genRandomString();
+        serverId = localPort + "";
     }
 
     // generate random String

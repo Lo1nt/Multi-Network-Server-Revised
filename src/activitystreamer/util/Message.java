@@ -1,10 +1,8 @@
 package activitystreamer.util;
 
 import activitystreamer.server.Connection;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
+import com.google.gson.reflect.TypeToken;
 
 import java.util.List;
 import java.util.Map;
@@ -62,22 +60,36 @@ public class Message {
         return true;
     }
 
-    public static void neighborAnnounce(Connection con, Map<Connection, List<Connection>> neighbors) {
+    public synchronized static void neighborAnnounce(Connection con, List<Integer> neighbors) {
+        Gson gson = new Gson();
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.NEIGHBOR_ANNOUNCE);
-        Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
-        json.add("neighbors", new JsonParser().parse(gson.toJson(neighbors)).getAsJsonObject());
-        con.writeMsg(new Gson().toJson(json));
+        json.addProperty("id", Settings.getServerId());
+        JsonArray ja = gson.toJsonTree(neighbors, new TypeToken<List<Integer>>() {
+        }.getType()).getAsJsonArray();
+        json.add("neighbors", ja);
+        con.writeMsg(gson.toJson(json));
     }
 
+    /**
+     *
+     * @param con
+     * @param load
+     * @param neighbors
+     */
     public synchronized static void serverAnnounce(Connection con, int load) {
+        Gson gson = new Gson();
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.SERVER_ANNOUNCE);
         json.addProperty("id", Settings.getServerId());
         json.addProperty("load", load);
         json.addProperty("hostname", Settings.getLocalHostname());
         json.addProperty("port", Settings.getLocalPort());
-        con.writeMsg(new Gson().toJson(json));
+
+//        JsonArray ja = gson.toJsonTree(neighbors, new TypeToken<List<Integer>>() {
+//        }.getType()).getAsJsonArray();
+//        json.add("neighbors", ja);
+        con.writeMsg(gson.toJson(json));
     }
 
     public synchronized static boolean lockRequest(Connection con, String username, String secret) {
