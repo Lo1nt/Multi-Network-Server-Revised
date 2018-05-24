@@ -19,6 +19,7 @@ public class Connection extends Thread implements Serializable {
     private boolean term = false;
 
     private Integer connID;
+    private long connTime;
     private boolean isAuthenticated = false;
     private boolean isLoggedIn = false;
 
@@ -88,7 +89,6 @@ public class Connection extends Thread implements Serializable {
         return open;
     }
 
-
     public Integer getConnID() {
         return connID;
     }
@@ -105,6 +105,14 @@ public class Connection extends Thread implements Serializable {
         isLoggedIn = loggedIn;
     }
 
+    public long getConnTime() {
+        return connTime;
+    }
+
+    public void setConnTime(long connTime) {
+        this.connTime = connTime;
+    }
+    
     public boolean isAuthenticated() {
         return isAuthenticated;
     }
@@ -120,4 +128,5 @@ public class Connection extends Thread implements Serializable {
     public void setListeningPort(int listeningPort) {
         this.listeningPort = listeningPort;
     }
+
 }

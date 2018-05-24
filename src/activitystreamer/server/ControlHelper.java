@@ -341,8 +341,8 @@ public class ControlHelper {
         return true;
     }
 
-
     private boolean onReceiveActivityMessage(Connection con, JsonObject request) {
+        long msgTimeMill = System.currentTimeMillis();
         if (!request.has("username")) {
             return Message.invalidMsg(con, "the message did not contain a username");
         }
@@ -368,12 +368,13 @@ public class ControlHelper {
         JsonObject broadcastAct = new JsonObject();
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
-
+        broadcastAct.addProperty("time", msgTimeMill);
 
 //        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
 
-
         relayMessage(con, broadcastAct);
+
+//        remove time info when broadcast to client
         username = updateMessageQueue(broadcastAct);
 
         clientBroadcastFromQueue(username);
@@ -437,11 +438,13 @@ public class ControlHelper {
 
     //    clean message queue for specific user
     private void clientBroadcastFromQueue(String username) {
+
         while (!Constant.messageQueue.get(username).isEmpty()) {
             JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
-
+            long timeMill = broadcastAct.get("time").getAsLong();
             for (Connection c : Control.getInstance().getConnections()) {
-                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD) && c.isLoggedIn()) {
+                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                        && c.isLoggedIn() && timeMill >= c.getConnTime()) {
                     c.writeMsg(broadcastAct.toString());
                 }
             }
@@ -449,13 +452,6 @@ public class ControlHelper {
 
     }
 
-//    public Map<Connection, JsonArray> getNeighborServers() {
-//        return neighborServers;
-//    }
-//
-//    public void setNeighborServers(Map<Connection, JsonArray> neighborServers) {
-//        this.neighborServers = neighborServers;
-//    }
 
     public Map<String, JsonObject> getOtherServers() {
         return otherServers;

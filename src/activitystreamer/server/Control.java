@@ -5,15 +5,11 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import activitystreamer.util.Constant;
-import activitystreamer.util.Message;
-import activitystreamer.util.User;
+import activitystreamer.util.*;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-
-import activitystreamer.util.Settings;
 
 public class Control extends Thread {
     private static final Logger log = LogManager.getLogger();
@@ -123,29 +119,10 @@ public class Control extends Thread {
     }
 
     private int minPortOfSystem(Map<String, JsonObject> otherServers) {
-        String minPort = (String) getMinKey(otherServers);
+        String minPort = (String) CommonUtil.getMinKey(otherServers);
         return Integer.parseInt(minPort);
     }
 
-    private Object getMinKey(Map<String, JsonObject> map) {
-        if (map == null) {
-            return null;
-        }
-        Set<String> set = map.keySet();
-        Object[] objs = set.toArray();
-        Arrays.sort(objs);
-        return objs[0];
-    }
-
-    public Object getMinValue(Map<Integer, Integer> map) {
-        if (map == null) {
-            return null;
-        }
-        Collection<Integer> c = map.values();
-        Object[] objs = c.toArray();
-        Arrays.sort(objs);
-        return objs[0];
-    }
 
     /**
      * A new incoming connection has been established, and a reference is returned
@@ -159,6 +136,7 @@ public class Control extends Thread {
         log.debug("incoming connection: " + Settings.socketAddress(s));
         Connection c = new Connection(s);
         c.setConnID(Constant.clientID);
+        c.setConnTime(System.currentTimeMillis());
         Constant.clientID += 2;          // TODO
         connections.add(c);
         return c;
