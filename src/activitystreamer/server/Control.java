@@ -115,6 +115,7 @@ public class Control extends Thread {
         log.debug("incoming connection: " + Settings.socketAddress(s));
         Connection c = new Connection(s);
         c.setConnID(Constant.clientID);
+        c.setConnTime(System.currentTimeMillis());
         Constant.clientID += 2;          // TODO
         connections.add(c);
         return c;

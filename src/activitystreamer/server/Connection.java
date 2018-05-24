@@ -28,6 +28,7 @@ public class Connection extends Thread {
     private boolean term = false;
 
     private Integer connID;
+    private long connTime;
     private boolean isAuthenticated = false;
     private boolean isLoggedIn = false;
 
@@ -91,7 +92,6 @@ public class Connection extends Thread {
         return open;
     }
 
-
     public Integer getConnID() {
         return connID;
     }
@@ -108,6 +108,14 @@ public class Connection extends Thread {
         isLoggedIn = loggedIn;
     }
 
+    public long getConnTime() {
+        return connTime;
+    }
+
+    public void setConnTime(long connTime) {
+        this.connTime = connTime;
+    }
+    
     public boolean isAuthenticated() {
         return isAuthenticated;
     }
