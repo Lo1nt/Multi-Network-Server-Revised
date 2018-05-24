@@ -8,10 +8,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import activitystreamer.util.Constant;
 import activitystreamer.util.Message;
 import activitystreamer.util.User;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 
 import activitystreamer.util.Settings;
 
@@ -23,7 +23,7 @@ public class Control extends Thread {
 
     private static Control control = null;
     private Map<String, User> localRegisteredUsers;
-    private Map<JSONObject, Connection> toBeRegisteredUsers;
+    private Map<JsonObject, Connection> toBeRegisteredUsers;
     private Map<String, User> externalRegisteredUsers;
 
     private int load;
@@ -74,9 +74,9 @@ public class Control extends Thread {
      * @return
      */
     public synchronized boolean process(Connection con, String msg) {
-        JSONObject request;
+        JsonObject request;
         try {
-            request = (JSONObject) new JSONParser().parse(msg);
+            request = (JsonObject) new JsonParser().parse(msg);
         } catch (Exception e) {
             return Message.invalidMsg(con, "the received message is not in valid format");
         }
@@ -85,7 +85,7 @@ public class Control extends Thread {
             return Message.invalidMsg(con, "the received message did not contain a command");
         }
 
-        String command = (String) request.get("command");
+        String command = request.get("command").getAsString();
         return ControlHelper.getInstance().process(command, con, request);
     }
 
@@ -162,6 +162,18 @@ public class Control extends Thread {
                     Message.serverAnnounce(c, load);
                 }
             }
+
+//            Map<Connection, List<Connection>> neighbors = new HashMap<>();
+//            for (Connection c : connections) {
+//                if (c.isOpen() && c.getName().equals(Connection.SERVER)) {
+//                    neighbors.put(c, c.getNeighbors());
+//                }
+//            }
+//            for (Connection c : connections) {
+//                Message.neighborAnnounce(c, neighbors);
+//            }
+
+
         }
         log.info("closing " + connections.size() + " connections");
         // clean up
@@ -192,11 +204,11 @@ public class Control extends Thread {
         return localRegisteredUsers;
     }
 
-    public void addToBeRegisteredUser(JSONObject request, Connection con) {
+    public void addToBeRegisteredUser(JsonObject request, Connection con) {
         toBeRegisteredUsers.put(request, con);
     }
 
-    public Map<JSONObject, Connection> getToBeRegisteredUsers() {
+    public Map<JsonObject, Connection> getToBeRegisteredUsers() {
         return toBeRegisteredUsers;
     }
 
