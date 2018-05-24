@@ -290,6 +290,7 @@ public class ControlHelper {
 
 
     private boolean onReceiveActivityMessage(Connection con, JSONObject request) {
+        long msgTimeMill = System.currentTimeMillis();
         if (!request.containsKey("username")) {
             return Message.invalidMsg(con, "the message did not contain a username");
         }
@@ -315,12 +316,13 @@ public class ControlHelper {
         JSONObject broadcastAct = new JSONObject();
         broadcastAct.put("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.put("activity", activity);
-        
+        broadcastAct.put("time", msgTimeMill);
 
 //        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
 
-        
         relayMessage(con, broadcastAct);
+        
+//        remove time info when broadcast to client
         username = updateMessageQueue(broadcastAct);
 
         clientBroadcastFromQueue(username);
@@ -341,8 +343,7 @@ public class ControlHelper {
 
 //      continue pass this ACTIVITY_BROADCAST to other server
         relayMessage(con, msg);
-
-
+        
         String username = updateMessageQueue(msg);
 
         clientBroadcastFromQueue(username);
@@ -386,9 +387,12 @@ public class ControlHelper {
     private void clientBroadcastFromQueue(String username) {
         while(!Constant.messageQueue.get(username).isEmpty()) {
             JSONObject broadcastAct = Constant.messageQueue.get(username).poll();
-
+            long timeMill = Long.parseLong((String) broadcastAct.get("time"));
+            
             for (Connection c: Control.getInstance().getConnections()) {
-                if (!c.getName().equals(Connection.SERVER) && c.isLoggedIn()) {
+                
+                // only the client established before the activity will receive msg
+                if (!c.getName().equals(Connection.SERVER) && c.isLoggedIn() && timeMill >= c.getConnTime()) {
                     c.writeMsg(broadcastAct.toJSONString());
                 }
             }

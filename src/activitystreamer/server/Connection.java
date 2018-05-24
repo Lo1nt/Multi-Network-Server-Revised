@@ -24,7 +24,7 @@ public class Connection extends Thread {
     private boolean term = false;
 
     private Integer connID;
-    private boolean flag = false;
+    private long connTime;
     private boolean isLoggedIn = false;
 
     public static final String SERVER = "SERVER";
@@ -88,7 +88,6 @@ public class Connection extends Thread {
         return open;
     }
 
-
     public Integer getConnID() {
         return connID;
     }
@@ -104,4 +103,14 @@ public class Connection extends Thread {
     public void setLoggedIn(boolean loggedIn) {
         isLoggedIn = loggedIn;
     }
+
+    public long getConnTime() {
+        return connTime;
+    }
+
+    public void setConnTime(long connTime) {
+        this.connTime = connTime;
+    }
+    
+    
 }
