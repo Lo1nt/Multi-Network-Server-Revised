@@ -26,7 +26,6 @@ public class Message {
     public static final String LOCK_DENIED = "LOCK_DENIED";
     public static final String LOCK_ALLOWED = "LOCK_ALLOWED";
     public static final String SYNCHRONIZE_USER = "SYNCHRONIZE_USER";
-    public static final String NEIGHBOR_ANNOUNCE = "NEIGHBOR_ANNOUNCE";
 
     public synchronized static boolean synchronizeUser(Connection con, Map<String, User> users) {
         JsonObject json = new JsonObject();
@@ -60,23 +59,7 @@ public class Message {
         return true;
     }
 
-    public synchronized static void neighborAnnounce(Connection con, List<Integer> neighbors) {
-        Gson gson = new Gson();
-        JsonObject json = new JsonObject();
-        json.addProperty("command", Message.NEIGHBOR_ANNOUNCE);
-        json.addProperty("id", Settings.getServerId());
-        JsonArray ja = gson.toJsonTree(neighbors, new TypeToken<List<Integer>>() {
-        }.getType()).getAsJsonArray();
-        json.add("neighbors", ja);
-        con.writeMsg(gson.toJson(json));
-    }
 
-    /**
-     *
-     * @param con
-     * @param load
-     * @param neighbors
-     */
     public synchronized static void serverAnnounce(Connection con, int load) {
         Gson gson = new Gson();
         JsonObject json = new JsonObject();
@@ -85,12 +68,9 @@ public class Message {
         json.addProperty("load", load);
         json.addProperty("hostname", Settings.getLocalHostname());
         json.addProperty("port", Settings.getLocalPort());
-
-//        JsonArray ja = gson.toJsonTree(neighbors, new TypeToken<List<Integer>>() {
-//        }.getType()).getAsJsonArray();
-//        json.add("neighbors", ja);
         con.writeMsg(gson.toJson(json));
     }
+
 
     public synchronized static boolean lockRequest(Connection con, String username, String secret) {
         JsonObject json = new JsonObject();
@@ -160,11 +140,6 @@ public class Message {
         json.addProperty("command", Message.LOGIN);
         json.addProperty("username", Settings.getUsername());
         return new Gson().toJson(json);
-
-//        JsonObject json = new JsonObject();
-//        json.addProperty("command", Message.LOGIN);
-//        json.addProperty("username", Settings.getUsername());
-//        return json.toString();
     }
 
     /**

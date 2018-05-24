@@ -23,8 +23,6 @@ public class Connection extends Thread implements Serializable {
     private boolean isAuthenticated = false;
     private boolean isLoggedIn = false;
 
-    private int listeningPort = Settings.getLocalPort();
-
     public static final String PARENT = "PARENT";
     public static final String CHILD = "CHILD";
 
@@ -70,7 +68,6 @@ public class Connection extends Thread implements Serializable {
             while (!term && (data = br.readLine()) != null) {
                 term = Control.getInstance().process(this, data);
             }
-            // 3780检测到3781挂了：
             log.debug("connection closed to " + Settings.socketAddress(socket));
             Control.getInstance().connectionClosed(this);
             dis.close();
@@ -119,14 +116,6 @@ public class Connection extends Thread implements Serializable {
 
     public void setAuthenticated(boolean authenticated) {
         isAuthenticated = authenticated;
-    }
-
-    public int getListeningPort() {
-        return listeningPort;
-    }
-
-    public void setListeningPort(int listeningPort) {
-        this.listeningPort = listeningPort;
     }
 
 }

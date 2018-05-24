@@ -25,9 +25,6 @@ public class ControlHelper {
     private Map<String, Connection> lockRequestMap; // username, source port
     private Map<String, JsonObject> otherServers; // all external servers
 
-    // the neighboring servers of neighboring servers, used for reconnection after some server crashes
-    private Map<Connection, JsonArray> neighborServers;
-
     private Map<String, Long> lastAnnounceTimestamps;
 
 
@@ -36,7 +33,6 @@ public class ControlHelper {
         otherServers = new ConcurrentHashMap<>();
         lockAllowedCount = new ConcurrentHashMap<>();
         lockRequestMap = new ConcurrentHashMap<>();
-        neighborServers = new ConcurrentHashMap<>();
 
         lastAnnounceTimestamps = new ConcurrentHashMap<>();
 
@@ -55,22 +51,13 @@ public class ControlHelper {
                             otherServers.remove(entry.getKey());
                             lastAnnounceTimestamps.remove(entry.getKey());
 
-                            // 从断掉server的neighbors中（除了自己）选出端口号最小的去连接
-                            // 如果neighbors中自己端口最小，就不做操作，等待别的server连入
-//                            Gson gson = new Gson();
-//                            JsonArray ja = neighborServers.get(entry.getKey()).getAsJsonArray();  // TODO!!!
-//                            List<Integer> portList = gson.fromJson(ja, new TypeToken<List<User>>() {
-//                            }.getType());
-//                            Collections.sort(portList);
-
                         }
                     }
                 }
             }
         }).start();
-
-
     }
+
 
     public static ControlHelper getInstance() {
         if (controlHelper == null) {
@@ -78,6 +65,7 @@ public class ControlHelper {
         }
         return controlHelper;
     }
+
 
     public boolean process(String command, Connection con, JsonObject request) {
         switch (command) {
@@ -120,7 +108,7 @@ public class ControlHelper {
         }.getType();
         Map<String, User> map = gson.fromJson(users.toString(), type);
         control.getExternalRegisteredUsers().putAll(map);
-        log.debug("users === " + users);
+//        log.debug("users === " + users);
         return false;
     }
 
@@ -163,7 +151,8 @@ public class ControlHelper {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
         otherServers.put(request.get("id").getAsString(), request);
-        lastAnnounceTimestamps.put(request.get("id").getAsString(), System.currentTimeMillis()); // TODO CHECK: 将每个server的announce时间戳记录下来
+        // record each server's timestamp of last SERVER_ANNOUNCE
+        lastAnnounceTimestamps.put(request.get("id").getAsString(), System.currentTimeMillis());
         relayMessage(con, request);
 
 //        log.debug(request.get("port").getAsInt());
@@ -285,8 +274,8 @@ public class ControlHelper {
         }
         String username = request.get("username").getAsString();
 
-        // 如果是register所在server:
-        // 清空toBeRegisteredUsers对应的username，并向它发送REGISTER_FAILED
+        // if originally registered server:
+        // remove corresponding username in toBeRegisteredUsers，and send REGISTER_FAILED to this server
         for (Map.Entry<JsonObject, Connection> entry : control.getToBeRegisteredUsers().entrySet()) {
             if (username.equals(entry.getKey().get("username").getAsString())) {
                 Connection c = entry.getValue();
@@ -295,15 +284,17 @@ public class ControlHelper {
                 Message.registerFailed(c, username + " is already registered with the system"); // true
             }
         }
-        // 如果是中继server:
-        // 把本地存储的externalUsers对应的username清空
+        // if intermediate server:
+        // remove corresponding username in externalUsers
         if (control.getExternalRegisteredUsers().containsKey(username)) {
             control.getExternalRegisteredUsers().remove(username);
         }
-        // 将LOCK_DENIED转发给其他server（除了来源server）用以清空externalRegisteredUsers中对应的username
+        // relay LOCK_DENIED to other servers (except the src server)
+        // in order to remove username in externalRegisteredUsers
         relayMessage(con, request);
         return false;
     }
+
 
     private boolean login(Connection con, JsonObject request) {
         if (!request.has("username")) {
@@ -321,13 +312,15 @@ public class ControlHelper {
             Message.loginSuccess(con, "logged in as user " + request.get("username").getAsString());
             for (String key : otherServers.keySet()) {
                 if (key != null && control.getLoad() - ((Long) otherServers.get(key).get("load").getAsLong()).intValue() >= 2) {
-                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(), "" + otherServers.get(key).get("port").getAsInt());
+                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(),
+                            "" + otherServers.get(key).get("port").getAsInt());
                 }
             }
             return false;
         } else if (!localRegisteredUsers.containsKey(username)) {
             return Message.loginFailed(con, "client is not registered with the server");
-        } else if (localRegisteredUsers.containsKey(username) && !(localRegisteredUsers.get(username).getSecret().equals(secret))) {
+        } else if (localRegisteredUsers.containsKey(username)
+                && !(localRegisteredUsers.get(username).getSecret().equals(secret))) {
             return Message.loginFailed(con, "attempt to login with wrong username");
         } else {
             return Message.loginFailed(con, "");
@@ -340,6 +333,7 @@ public class ControlHelper {
         con.setLoggedIn(false);
         return true;
     }
+
 
     private boolean onReceiveActivityMessage(Connection con, JsonObject request) {
         long msgTimeMill = System.currentTimeMillis();
@@ -426,7 +420,12 @@ public class ControlHelper {
         }
     }
 
-    //    set up message queue for specific user and return username
+    /**
+     * set up message queue for specific user and return username
+     *
+     * @param msg
+     * @return
+     */
     private String updateMessageQueue(JsonObject msg) {
 //        String username = msg.get("username").getAsString();
         String username = msg.get("activity").getAsJsonObject().get("authenticated_user").getAsString(); //TODO check json null
@@ -436,7 +435,11 @@ public class ControlHelper {
     }
 
 
-    //    clean message queue for specific user
+    /**
+     * clean message queue for specific user
+     *
+     * @param username
+     */
     private void clientBroadcastFromQueue(String username) {
 
         while (!Constant.messageQueue.get(username).isEmpty()) {

@@ -102,12 +102,10 @@ public class Control extends Thread {
             con.setLoggedIn(false);
         }
 
-            // 原parent connection断了，则要与其他server建立新connection
-
+        // If parent server crashes，then establish new connection to another server (the one with minimum port number)
         if (con.getName().equals(Connection.PARENT)) {
             Map<String, JsonObject> otherServers = ControlHelper.getInstance().getOtherServers();
 
-            // choose the server with minimum port number to reconnect
             // TODO there's a restriction: if the server with minimum port number crashes, then...
             int newRemotePort = minPortOfSystem(otherServers);
             if (newRemotePort != Settings.getLocalPort()) {
@@ -137,14 +135,13 @@ public class Control extends Thread {
         Connection c = new Connection(s);
         c.setConnID(Constant.clientID);
         c.setConnTime(System.currentTimeMillis());
-        Constant.clientID += 2;          // TODO
+        Constant.clientID += 2;
         connections.add(c);
         return c;
     }
 
     /**
-     * A new outgoing connection has been established, and a reference is returned
-     * to it.
+     * A new outgoing connection has been established, and a reference is returned to it.
      *
      * @param s
      * @return
@@ -163,8 +160,6 @@ public class Control extends Thread {
     public void run() {
         log.info("using activity interval of " + Settings.getActivityInterval() + " milliseconds");
         while (!term) {
-            // do something with 5 second intervals in between
-
             load = 0;
             for (Connection c : connections) {
                 if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)) {
@@ -178,6 +173,7 @@ public class Control extends Thread {
                 }
             }
 
+            // do something with 5 second intervals in between
             try {
                 Thread.sleep(Settings.getActivityInterval());
             } catch (InterruptedException e) {
