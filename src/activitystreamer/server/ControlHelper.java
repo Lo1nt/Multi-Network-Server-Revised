@@ -136,7 +136,6 @@ public class ControlHelper {
 
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
-        // why
         Constant.clientID -= 2;
         return false;
     }
@@ -210,6 +209,7 @@ public class ControlHelper {
      * @param request
      * @return
      */
+
     private boolean onLockRequest(Connection con, JsonObject request) {
         if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
