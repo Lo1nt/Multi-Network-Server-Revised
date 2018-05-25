@@ -21,7 +21,7 @@ public class BroadcastMessage {
     private Control control;
     //    BlockingQueue<String> messageQueue = new LinkedBlockingQueue<String>();
     private static ConcurrentLinkedQueue<JsonObject> messageQueue = new ConcurrentLinkedQueue<JsonObject>();
-    Map<JsonObject, List<Connection>> coveredConnections = new ConcurrentHashMap<>();
+    Map<JsonObject, List<String>> coveredServers = new ConcurrentHashMap<>();
 
     private BroadcastMessage() {
         control = Control.getInstance();
@@ -55,8 +55,15 @@ public class BroadcastMessage {
         List<Connection> connectionList = Collections.synchronizedList(new ArrayList<>());
 
         connectionList.add(con);
-        coveredConnections.put(msg, connectionList);
+        coveredServers.put(msg, connectionList);
         messageQueue.offer(msg);
+    }
+
+    public boolean checkAck(Connection,JsonObject msg){
+        if(coveredServers.containsKey(msg)){
+
+        }
+        return false;
     }
 
     /**
@@ -65,7 +72,7 @@ public class BroadcastMessage {
      * @param msg
      */
     private void relayMessage(JsonObject msg) {
-        List<Connection> connectionList = coveredConnections.get(msg);
+        List<String> connectionList = coveredServers.get(msg);
         for (Connection c : control.getConnections()) {
             if (!connectionList.contains(c) && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
                 c.writeMsg(msg.toString());
