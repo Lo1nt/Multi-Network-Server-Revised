@@ -149,10 +149,14 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
+        relayMessage(con, request);
+
+        // 记录是从child还是parent传来的
+        request.addProperty("is_subtree", con.getName().equals(Connection.CHILD));
+
         control.getOtherServers().put(request.get("id").getAsString(), request);
         // record each server's timestamp of last SERVER_ANNOUNCE
         control.getLastAnnounceTimestamps().put(request.get("id").getAsString(), System.currentTimeMillis());
-        relayMessage(con, request);
 
 //        log.debug(request.get("port").getAsInt());
 //        log.debug(otherServers);

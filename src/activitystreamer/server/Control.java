@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import activitystreamer.Server;
 import activitystreamer.util.*;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -109,13 +110,19 @@ public class Control extends Thread {
             con.setLoggedIn(false);
         }
 
-        // If parent server crashes，then establish new connection to another server (the one having a parent)
+        // If parent server crashes，then establish new connection to another server (the one having connections to other servers)
         if (con.getName().equals(Connection.PARENT)) {
-
-            int newRemotePort = chooseNewPort(otherServers);
-            if (newRemotePort != -1 && newRemotePort != Settings.getLocalPort()) {
-                Settings.setRemotePort(newRemotePort);
+            int parentCount = otherServers.get(con.getSocket().getPort() + "").getAsJsonObject().get("parent_count").getAsInt();
+            if (parentCount == 0) { // 如果是root节点挂了，单独处理:
+                // 这里需要预先run一个备用server，port: 3779
+                Settings.setRemotePort(Settings.AUXILIARY_PORT);
                 initiateConnection();
+            } else {
+                int newRemotePort = chooseNewPort(otherServers);
+                if (newRemotePort != -1 && newRemotePort != Settings.getLocalPort()) {
+                    Settings.setRemotePort(newRemotePort);
+                    initiateConnection();
+                }
             }
         }
 
@@ -124,8 +131,9 @@ public class Control extends Thread {
     private int chooseNewPort(Map<String, JsonObject> otherServers) {
         Collection<JsonObject> values = otherServers.values();
         for (JsonObject jo : values) {
-            int parents = jo.get("server_count").getAsInt();
-            if (parents > 0) {
+            int serverCount = jo.get("server_count").getAsInt(); //TODO
+            // if the server has connections, and server is not among subtree
+            if (serverCount > 0 && !jo.get("is_subtree").getAsBoolean()) {
                 return jo.get("port").getAsInt();
             }
         }
@@ -178,16 +186,20 @@ public class Control extends Thread {
                 }
             }
 
-            int serverCount = 0;
+            int parentCount = 0;
+            int childCount = 0;
             for (Connection c : connections) {
-                if (c.isOpen() && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
-                    serverCount += 1;
+                if (c.isOpen() && c.getName().equals(Connection.PARENT)) {
+                    parentCount += 1;
+                }
+                if (c.isOpen() && c.getName().equals(Connection.CHILD)) {
+                    childCount += 1;
                 }
             }
 
             for (Connection c : connections) {
                 if (c.isOpen() && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
-                    Message.serverAnnounce(c, load, serverCount);
+                    Message.serverAnnounce(c, load, parentCount, childCount);
                 }
             }
 
