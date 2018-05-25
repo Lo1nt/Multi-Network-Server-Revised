@@ -35,7 +35,6 @@ public class BroadcastMessage {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    //TODO eject message from the queue.
                     JsonObject msg = messageQueue.poll();
                     relayMessage(msg);
 

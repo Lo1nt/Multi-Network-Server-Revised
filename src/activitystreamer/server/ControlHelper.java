@@ -379,8 +379,8 @@ public class ControlHelper {
 
 
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
-        BroadcastMessage.getInstance().injectMsg(con, msg);
-//        relayMessage(con, msg);
+//        BroadcastMessage.getInstance().injectMsg(con, msg);
+        relayMessage(con, msg);
         broadcastToClient(msg);
         return false;
     }
