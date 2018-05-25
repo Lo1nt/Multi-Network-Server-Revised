@@ -28,6 +28,7 @@ public class Message {
     public static final String LOCK_ALLOWED = "LOCK_ALLOWED";
     public static final String SYNCHRONIZE_USER = "SYNCHRONIZE_USER";
     public static final String ACK = "ACK";
+    public static final String BROADCASTSUCCESS = "BROADCASTSUCCESS";
 
 
     public synchronized static boolean synchronizeUser(Connection con, Map<String, User> users) {
@@ -37,6 +38,14 @@ public class Message {
         json.add("users", new JsonParser().parse(gson.toJson(users)).getAsJsonObject());
         con.writeMsg(new Gson().toJson(json));
         return false;
+    }
+
+    public synchronized static void broadCastSuccess(Connection con, JsonObject msg) {
+        JsonObject json = new JsonObject();
+        json.addProperty("command", Message.BROADCASTSUCCESS);
+        json.add("msg", msg);
+        con.writeMsg(new Gson().toJson(json));
+        return;
     }
 
     public synchronized static boolean returnAck(Connection con, JsonObject msg) {
