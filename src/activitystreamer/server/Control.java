@@ -59,7 +59,7 @@ public class Control extends Thread {
         // make a connection to another server if remote hostname is supplied
         if (Settings.getRemoteHostname() != null) {
             try {
-                Connection c = outgoingConnection(new Socket(Settings.getRemoteHostname(), Settings.getRemotePort()));
+                outgoingConnection(new Socket(Settings.getRemoteHostname(), Settings.getRemotePort()));
             } catch (IOException e) {
                 log.error("failed to make connection to " + Settings.getRemoteHostname() + ":"
                         + Settings.getRemotePort() + " :" + e);

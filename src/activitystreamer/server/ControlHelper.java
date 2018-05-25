@@ -444,6 +444,7 @@ public class ControlHelper {
         while (!Constant.messageQueue.get(username).isEmpty()) {
             JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
             long timeMill = broadcastAct.get("time").getAsLong();
+            broadcastAct.remove("time");
             for (Connection c : Control.getInstance().getConnections()) {
                 if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                         && c.isLoggedIn() && timeMill >= c.getConnTime()) {
