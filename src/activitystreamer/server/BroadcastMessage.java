@@ -17,9 +17,13 @@ public class BroadcastMessage {
     private Control control;
     //    BlockingQueue<String> messageQueue = new LinkedBlockingQueue<String>();
     private static ConcurrentLinkedQueue<JsonObject> messageQueue = new ConcurrentLinkedQueue<JsonObject>();
+    // destroy when List has the same values with otherServers now.
     Map<JsonObject, List<String>> coveredServers = new ConcurrentHashMap<>();
     Map<JsonObject, Connection> linkMsgCon = new ConcurrentHashMap<>();
-    Map<JsonObject, List<JsonObject>> waitAck = new ConcurrentHashMap<>();
+    // destroy when list has the same values with otherServers before.
+    Map<JsonObject, List<String>> waitAck = new ConcurrentHashMap<>();
+    private Map<JsonObject, List<String>> snapshotOtherServers = new ConcurrentHashMap<>();
+    public Map<JsonObject, List<String>> remainOtherServers = new ConcurrentHashMap<>();
 
     private BroadcastMessage() {
         control = Control.getInstance();
@@ -35,10 +39,17 @@ public class BroadcastMessage {
                     }
                     JsonObject msg = messageQueue.poll();
                     relayMessage(msg);
-                    waitAck.put(msg, new List<JsonObject>);
-                    for (JsonObject message : waitAck) {
+                    waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
+
+
+                    for (JsonObject message : coveredServers.keySet()) {
                         List<String> serverList = coveredServers.get(message);
-                        for
+
+                    }
+
+                    for (JsonObject message : waitAck.keySet()) {
+                        List<String> serverList = waitAck.get(message);
+
                     }
                 }
             }
@@ -57,6 +68,9 @@ public class BroadcastMessage {
         coveredServers.put(msg, Collections.synchronizedList(new ArrayList<>()));
         linkMsgCon.put(msg, con);
         messageQueue.offer(msg);
+        List<String> tmp = new ArrayList<>(Control.getInstance().getOtherServers().keySet());
+        snapshotOtherServers.put(msg, tmp);
+        remainOtherServers.put(msg, tmp);
     }
 
     public boolean checkAck(JsonObject request) {
