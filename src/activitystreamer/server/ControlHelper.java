@@ -343,7 +343,7 @@ public class ControlHelper {
 
 
     private boolean onReceiveActivityMessage(Connection con, JsonObject request) {
-        long msgTimeMill = System.currentTimeMillis();
+
         if (!request.has("username")) {
             return Message.invalidMsg(con, "the message did not contain a username");
         }
@@ -369,7 +369,7 @@ public class ControlHelper {
         JsonObject broadcastAct = new JsonObject();
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
-        broadcastAct.addProperty("time", msgTimeMill);
+        broadcastAct.addProperty("time",System.currentTimeMillis());
 
 //        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
 
