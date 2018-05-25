@@ -368,10 +368,10 @@ public class ControlHelper {
         JsonObject broadcastAct = new JsonObject();
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
-        broadcastAct.addProperty("time",System.currentTimeMillis());
+        broadcastAct.addProperty("time", System.currentTimeMillis());
 
         relayMessage(con, broadcastAct);
-        clientBroadcast(broadcastAct);
+        clientBroadcast(con, broadcastAct);
 
         return false;
 
@@ -405,12 +405,13 @@ public class ControlHelper {
      *
      * @param broadcastAct
      */
-    private void clientBroadcast(JsonObject broadcastAct) {
+    private void clientBroadcast(Connection src, JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
         broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                    && c.isLoggedIn() && timeMill >= c.getConnTime()
+            c.getSocket().getInetAddress() != src.getSocket().getInetAddress()){
                 c.writeMsg(broadcastAct.toString());
             }
         }
