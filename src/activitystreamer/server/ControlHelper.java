@@ -370,16 +370,17 @@ public class ControlHelper {
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time", System.currentTimeMillis());
 
-        relayMessage(con, broadcastAct);
         clientBroadcast(con, broadcastAct);
-
+        BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
+//        relayMessage(con, broadcastAct);
         return false;
 
     }
 
 
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
-        relayMessage(con, msg);
+        BroadcastMessage.getInstance().injectMsg(con, msg);
+//        relayMessage(con, msg);
         broadcastToClient(msg);
         return false;
     }
