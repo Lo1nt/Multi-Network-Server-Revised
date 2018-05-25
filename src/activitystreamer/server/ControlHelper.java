@@ -123,6 +123,7 @@ public class ControlHelper {
         } else if (control.getConnections().contains(con) && con.isAuthenticated()) {
             return Message.invalidMsg(con, "the server has already successfully authenticated");
         }
+        // TODO ack of successfully authenticate
         // No reply if the authentication succeeded.
         con.setAuthenticated(true);
         con.setName(Connection.CHILD);
@@ -135,6 +136,7 @@ public class ControlHelper {
 
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
+        // why
         Constant.clientID -= 2;
         return false;
     }
@@ -173,6 +175,11 @@ public class ControlHelper {
 
         String username = request.get("username").getAsString();
         String secret = request.get("secret").getAsString();
+
+        if (con.isLoggedIn()) {
+            return Message.registerFailed(con, " already logged in the system"); // true
+        }
+
         // If username is registered locally or externally, then fail
         if (control.getLocalRegisteredUsers().containsKey(username)
                 || control.getExternalRegisteredUsers().containsKey(username)) {
@@ -192,9 +199,6 @@ public class ControlHelper {
             }
         }
 
-        if (con.isLoggedIn()) {
-            return Message.registerFailed(con, username + " is already registered with the system"); // true
-        }
         return false;
     }
 
