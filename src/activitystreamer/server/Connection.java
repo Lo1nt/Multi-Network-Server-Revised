@@ -109,7 +109,7 @@ public class Connection extends Thread implements Serializable {
     public void setConnTime(long connTime) {
         this.connTime = connTime;
     }
-    
+
     public boolean isAuthenticated() {
         return isAuthenticated;
     }
