@@ -19,7 +19,6 @@ public class Settings {
     // set the heart beat timeout = 10 seconds
     private static int activityTimeout = 10 * 1000;
 
-
     public static final int AUXILIARY_PORT = 3779;
 
     // server id.

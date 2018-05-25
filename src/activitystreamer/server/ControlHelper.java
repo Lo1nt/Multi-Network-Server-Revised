@@ -14,7 +14,6 @@ import org.apache.logging.log4j.Logger;
 import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
@@ -371,39 +370,17 @@ public class ControlHelper {
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time",System.currentTimeMillis());
 
-//        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
-
         relayMessage(con, broadcastAct);
-
         clientBroadcast(broadcastAct);
-        
-        /*
-        for (Connection c : control.getConnections()) {
-            if (c.getName().equals(Connection.SERVER) || c.isLoggedIn()) {
-                Message.activityBroadcast(c, broadcastAct);
-            }
-        }
-        */
+
         return false;
 
     }
 
 
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
-
-//      continue pass this ACTIVITY_BROADCAST to other server
         relayMessage(con, msg);
-
         clientBroadcast(msg);
-
-      /*
-      for (Connection c : control.getConnections()) {
-          if ( (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
-                  && (c.getName().equals(Connection.SERVER)) || (!c.getName().equals(Connection.SERVER) && c.isLoggedIn())) ) {
-              c.writeMsg(msg.toJSONString());
-          }
-      }
-      */
         return false;
     }
 
@@ -424,9 +401,9 @@ public class ControlHelper {
 
 
     /**
-     * sent message to valid user
+     * send message to valid user
      *
-     * @param username
+     * @param broadcastAct
      */
     private void clientBroadcast(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
