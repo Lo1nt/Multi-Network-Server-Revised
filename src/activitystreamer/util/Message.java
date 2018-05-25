@@ -60,12 +60,13 @@ public class Message {
     }
 
 
-    public synchronized static void serverAnnounce(Connection con, int load) {
+    public synchronized static void serverAnnounce(Connection con, int load, int serverCount) {
         Gson gson = new Gson();
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.SERVER_ANNOUNCE);
         json.addProperty("id", Settings.getServerId());
         json.addProperty("load", load);
+        json.addProperty("server_count", serverCount);
         json.addProperty("hostname", Settings.getLocalHostname());
         json.addProperty("port", Settings.getLocalPort());
         con.writeMsg(gson.toJson(json));

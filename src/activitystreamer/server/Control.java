@@ -109,12 +109,11 @@ public class Control extends Thread {
             con.setLoggedIn(false);
         }
 
-        // If parent server crashes，then establish new connection to another server (the one with minimum port number)
+        // If parent server crashes，then establish new connection to another server (the one having a parent)
         if (con.getName().equals(Connection.PARENT)) {
 
-            // TODO there's a restriction: if the server with minimum port number crashes, then...
-            int newRemotePort = minPortOfSystem(otherServers);
-            if (newRemotePort != Settings.getLocalPort()) {
+            int newRemotePort = chooseNewPort(otherServers);
+            if (newRemotePort != -1 && newRemotePort != Settings.getLocalPort()) {
                 Settings.setRemotePort(newRemotePort);
                 initiateConnection();
             }
@@ -122,9 +121,15 @@ public class Control extends Thread {
 
     }
 
-    private int minPortOfSystem(Map<String, JsonObject> otherServers) {
-        String minPort = (String) CommonUtil.getMinKey(otherServers);
-        return Integer.parseInt(minPort);
+    private int chooseNewPort(Map<String, JsonObject> otherServers) {
+        Collection<JsonObject> values = otherServers.values();
+        for (JsonObject jo : values) {
+            int parents = jo.get("server_count").getAsInt();
+            if (parents > 0) {
+                return jo.get("port").getAsInt();
+            }
+        }
+        return -1;
     }
 
 
@@ -173,9 +178,16 @@ public class Control extends Thread {
                 }
             }
 
+            int serverCount = 0;
             for (Connection c : connections) {
                 if (c.isOpen() && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
-                    Message.serverAnnounce(c, load);
+                    serverCount += 1;
+                }
+            }
+
+            for (Connection c : connections) {
+                if (c.isOpen() && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
+                    Message.serverAnnounce(c, load, serverCount);
                 }
             }
 
