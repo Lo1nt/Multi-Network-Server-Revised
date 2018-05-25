@@ -26,8 +26,6 @@ public class Connection extends Thread implements Serializable {
     public static final String PARENT = "PARENT";
     public static final String CHILD = "CHILD";
 
-    private Control control = Control.getInstance();
-
     public Connection(Socket s) throws IOException {
         dis = new DataInputStream(s.getInputStream());
         dos = new DataOutputStream(s.getOutputStream());
@@ -109,7 +107,7 @@ public class Connection extends Thread implements Serializable {
     public void setConnTime(long connTime) {
         this.connTime = connTime;
     }
-    
+
     public boolean isAuthenticated() {
         return isAuthenticated;
     }

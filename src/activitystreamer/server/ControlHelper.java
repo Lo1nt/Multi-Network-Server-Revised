@@ -6,7 +6,6 @@ import activitystreamer.util.Settings;
 import activitystreamer.util.User;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import org.apache.logging.log4j.LogManager;
@@ -15,7 +14,6 @@ import org.apache.logging.log4j.Logger;
 import java.lang.reflect.Type;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class ControlHelper {
     private static final Logger log = LogManager.getLogger();
@@ -23,18 +21,12 @@ public class ControlHelper {
     private Control control;
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
-    private Map<String, JsonObject> otherServers; // all external servers
-
-    private Map<String, Long> lastAnnounceTimestamps;
 
 
     private ControlHelper() {
         control = Control.getInstance();
-        otherServers = new ConcurrentHashMap<>();
         lockAllowedCount = new ConcurrentHashMap<>();
         lockRequestMap = new ConcurrentHashMap<>();
-
-        lastAnnounceTimestamps = new ConcurrentHashMap<>();
 
         new Thread(new Runnable() {
             @Override
@@ -45,11 +37,11 @@ public class ControlHelper {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    for (Map.Entry<String, Long> entry : lastAnnounceTimestamps.entrySet()) {
-                        // 如果超过10秒钟没有收到announce，判定为超时，从server列表中移除
+                    for (Map.Entry<String, Long> entry : control.getLastAnnounceTimestamps().entrySet()) {
+                        // if hasn't received SERVER_ANNOUNCE for 10 seconds，判定为超时，从server列表中移除
                         if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
-                            otherServers.remove(entry.getKey());
-                            lastAnnounceTimestamps.remove(entry.getKey());
+                            control.getOtherServers().remove(entry.getKey());
+                            control.getLastAnnounceTimestamps().remove(entry.getKey());
 
                         }
                     }
@@ -101,6 +93,12 @@ public class ControlHelper {
     }
 
 
+    /**
+     * Add all user info into externalRegisteredUsers.
+     *
+     * @param request
+     * @return
+     */
     private boolean synchronizeUser(JsonObject request) {
         Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
         JsonObject users = (JsonObject) request.get("users");
@@ -124,6 +122,8 @@ public class ControlHelper {
         } else if (control.getConnections().contains(con) && con.isAuthenticated()) {
             return Message.invalidMsg(con, "the server has already successfully authenticated");
         }
+
+        // TODO ack of successfully authenticate
 
         // No reply if the authentication succeeded.
         con.setAuthenticated(true);
@@ -151,10 +151,14 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
-        otherServers.put(request.get("id").getAsString(), request);
-        // record each server's timestamp of last SERVER_ANNOUNCE
-        lastAnnounceTimestamps.put(request.get("id").getAsString(), System.currentTimeMillis());
         relayMessage(con, request);
+
+        // 记录是从child还是parent传来的
+        request.addProperty("is_subtree", con.getName().equals(Connection.CHILD));
+
+        control.getOtherServers().put(request.get("id").getAsString(), request);
+        // record each server's timestamp of last SERVER_ANNOUNCE
+        control.getLastAnnounceTimestamps().put(request.get("id").getAsString(), System.currentTimeMillis());
 
 //        log.debug(request.get("port").getAsInt());
 //        log.debug(otherServers);
@@ -171,6 +175,11 @@ public class ControlHelper {
 
         String username = request.get("username").getAsString();
         String secret = request.get("secret").getAsString();
+
+        if (con.isLoggedIn()) {
+            return Message.registerFailed(con, " already logged in the system"); // true
+        }
+
         // If username is registered locally or externally, then fail
         if (control.getLocalRegisteredUsers().containsKey(username)
                 || control.getExternalRegisteredUsers().containsKey(username)) {
@@ -178,7 +187,7 @@ public class ControlHelper {
         } else {
             control.addToBeRegisteredUser(request, con);
             lockAllowedCount.put(username, 0);
-            if (otherServers.size() == 0) { // if single server in the system
+            if (control.getOtherServers().size() == 0) { // if single server in the system
                 control.addLocalRegisteredUser(username, secret);
                 return Message.registerSuccess(con, "register success for " + username);
             }
@@ -190,9 +199,6 @@ public class ControlHelper {
             }
         }
 
-        if (con.isLoggedIn()) {
-            return Message.registerFailed(con, username + " is already registered with the system"); // true
-        }
         return false;
     }
 
@@ -204,6 +210,7 @@ public class ControlHelper {
      * @param request
      * @return
      */
+
     private boolean onLockRequest(Connection con, JsonObject request) {
         if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
@@ -221,7 +228,7 @@ public class ControlHelper {
                 }
             }
         } else { // locally ALLOWED
-            // 暂时把user信息加入到externalUsers里
+            // temporarily add user info to externalUsers
             control.addExternalRegisteredUser(username, secret);
 
             // relay LOCK_REQUEST to other servers, except which it comes from
@@ -245,9 +252,9 @@ public class ControlHelper {
         }
         lockAllowedCount.put(username, ++count); // local LOCK_ALLOWED count += 1
 
-        // 如果是register所在server
-        // 如果收到了所有server发来的LOCK_ALLOWED，注册成功
-        if (otherServers.size() == lockAllowedCount.get(username)) {
+        // if originally registered server:
+        // if has received LOCK_ALLOWED from all servers，then REGISTER_SUCCESS
+        if (control.getOtherServers().size() == lockAllowedCount.get(username)) {
             for (JsonObject key : control.getToBeRegisteredUsers().keySet()) {
                 Connection c = control.getToBeRegisteredUsers().get(key);
                 if (c != null && username.equals(key.get("username").getAsString())) {
@@ -258,8 +265,8 @@ public class ControlHelper {
             }
         }
 
-        // 如果是中继server
-        // 只对LOCK_REQUEST的来源转发LOCK_ALLOWED
+        // if intermediate server:
+        // relay LOCK_ALLOWED only to the server which LOCK_REQUEST comes from
         if (lockRequestMap.get(username) != null) {
             Connection src = lockRequestMap.get(username);
             src.writeMsg(request.getAsString());
@@ -311,10 +318,10 @@ public class ControlHelper {
                 || externalRegisteredUsers.containsKey(username) && externalRegisteredUsers.get(username).getSecret().equals(secret)) {
             con.setLoggedIn(true);
             Message.loginSuccess(con, "logged in as user " + request.get("username").getAsString());
-            for (String key : otherServers.keySet()) {
-                if (key != null && control.getLoad() - ((Long) otherServers.get(key).get("load").getAsLong()).intValue() >= 2) {
-                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(),
-                            "" + otherServers.get(key).get("port").getAsInt());
+            for (String key : control.getOtherServers().keySet()) {
+                if (key != null && control.getLoad() - ((Long) control.getOtherServers().get(key).get("load").getAsLong()).intValue() >= 2) {
+                    return Message.redirect(con, control.getOtherServers().get(key).get("hostname").getAsString(),
+                            "" + control.getOtherServers().get(key).get("port").getAsInt());
                 }
             }
             return false;
@@ -337,7 +344,7 @@ public class ControlHelper {
 
 
     private boolean onReceiveActivityMessage(Connection con, JsonObject request) {
-        long msgTimeMill = System.currentTimeMillis();
+
         if (!request.has("username")) {
             return Message.invalidMsg(con, "the message did not contain a username");
         }
@@ -363,46 +370,20 @@ public class ControlHelper {
         JsonObject broadcastAct = new JsonObject();
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
-        broadcastAct.addProperty("time", msgTimeMill);
+        broadcastAct.addProperty("time", System.currentTimeMillis());
 
-//        pass activity_message (will be transformed as ACTIVITY_BROADCAST) to next server
-
-        relayMessage(con, broadcastAct);
-
-//        remove time info when broadcast to client
-        username = updateMessageQueue(broadcastAct);
-
-        clientBroadcastFromQueue(username);
-        
-        /*
-        for (Connection c : control.getConnections()) {
-            if (c.getName().equals(Connection.SERVER) || c.isLoggedIn()) {
-                Message.activityBroadcast(c, broadcastAct);
-            }
-        }
-        */
+        clientBroadcast(con, broadcastAct);
+        BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
+//        relayMessage(con, broadcastAct);
         return false;
 
     }
 
 
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
-
-//      continue pass this ACTIVITY_BROADCAST to other server
+//        BroadcastMessage.getInstance().injectMsg(con, msg);
         relayMessage(con, msg);
-
-        String username = updateMessageQueue(msg);
-
-        clientBroadcastFromQueue(username);
-
-      /*
-      for (Connection c : control.getConnections()) {
-          if ( (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
-                  && (c.getName().equals(Connection.SERVER)) || (!c.getName().equals(Connection.SERVER) && c.isLoggedIn())) ) {
-              c.writeMsg(msg.toJSONString());
-          }
-      }
-      */
+        broadcastToClient(msg);
         return false;
     }
 
@@ -421,44 +402,40 @@ public class ControlHelper {
         }
     }
 
-    /**
-     * set up message queue for specific user and return username
-     *
-     * @param msg
-     * @return
-     */
-    private String updateMessageQueue(JsonObject msg) {
-//        String username = msg.get("username").getAsString();
-        String username = msg.get("activity").getAsJsonObject().get("authenticated_user").getAsString(); //TODO check json null
-        Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<>());
-        Constant.messageQueue.get(username).offer(msg);
-        return username;
-    }
-
 
     /**
-     * clean message queue for specific user
+     * send message to valid user
      *
-     * @param username
+     * @param broadcastAct
      */
-    private void clientBroadcastFromQueue(String username) {
-
-        while (!Constant.messageQueue.get(username).isEmpty()) {
-            JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
-            long timeMill = broadcastAct.get("time").getAsLong();
-            for (Connection c : Control.getInstance().getConnections()) {
-                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                        && c.isLoggedIn() && timeMill >= c.getConnTime()) {
-                    c.writeMsg(broadcastAct.toString());
-                }
+    private void clientBroadcast(Connection src, JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() &&
+                    c.getSocket().getInetAddress() != src.getSocket().getInetAddress()) {
+                c.writeMsg(broadcastAct.toString());
             }
         }
 
     }
 
+    /**
+     * send message to valid user
+     *
+     * @param broadcastAct
+     */
+    private void broadcastToClient(JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                c.writeMsg(broadcastAct.toString());
+            }
+        }
 
-    public Map<String, JsonObject> getOtherServers() {
-        return otherServers;
     }
 
 }

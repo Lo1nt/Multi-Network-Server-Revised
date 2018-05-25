@@ -19,10 +19,11 @@ public class Settings {
     // set the heart beat timeout = 10 seconds
     private static int activityTimeout = 10 * 1000;
 
+    public static final int AUXILIARY_PORT = 3779;
+
     // server id.
     private static String serverId;
 
-    // serverIdLength
     private static final int RANDOM_LENGTH = 26;
     private static String serverSecret = "1";
 
@@ -30,13 +31,11 @@ public class Settings {
     private static String userSecret = null;
     private static String username = "anonymous";
 
-    // set server id.
     public static void setServerId() {
         serverId = localPort + "";
     }
 
-    // generate random String
-    public static String genRandomString() {
+    public static String generateRandomString() {
         String range = "0123456789abcdefghijklmnopqrstuvwxyz";
         Random rd = new Random();
         StringBuilder randomId = new StringBuilder();
@@ -47,7 +46,6 @@ public class Settings {
         return randomId.toString();
     }
 
-    // get server id.
     public static String getServerId() {
         return serverId;
     }

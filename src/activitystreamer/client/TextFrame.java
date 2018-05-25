@@ -10,7 +10,6 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 
-@SuppressWarnings("serial")
 public class TextFrame extends JFrame implements ActionListener {
     private static final Logger log = LogManager.getLogger();
     private JTextArea inputText;
