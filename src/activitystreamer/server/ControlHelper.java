@@ -6,7 +6,6 @@ import activitystreamer.util.Settings;
 import activitystreamer.util.User;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 import org.apache.logging.log4j.LogManager;
@@ -23,18 +22,12 @@ public class ControlHelper {
     private Control control;
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
-    private Map<String, JsonObject> otherServers; // all external servers
-
-    private Map<String, Long> lastAnnounceTimestamps;
 
 
     private ControlHelper() {
         control = Control.getInstance();
-        otherServers = new ConcurrentHashMap<>();
         lockAllowedCount = new ConcurrentHashMap<>();
         lockRequestMap = new ConcurrentHashMap<>();
-
-        lastAnnounceTimestamps = new ConcurrentHashMap<>();
 
         new Thread(new Runnable() {
             @Override
@@ -45,11 +38,11 @@ public class ControlHelper {
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    for (Map.Entry<String, Long> entry : lastAnnounceTimestamps.entrySet()) {
-                        // 如果超过10秒钟没有收到announce，判定为超时，从server列表中移除
+                    for (Map.Entry<String, Long> entry : control.getLastAnnounceTimestamps().entrySet()) {
+                        // if hasn't received SERVER_ANNOUNCE for 10 seconds，判定为超时，从server列表中移除
                         if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
-                            otherServers.remove(entry.getKey());
-                            lastAnnounceTimestamps.remove(entry.getKey());
+                            control.getOtherServers().remove(entry.getKey());
+                            control.getLastAnnounceTimestamps().remove(entry.getKey());
 
                         }
                     }
@@ -101,6 +94,12 @@ public class ControlHelper {
     }
 
 
+    /**
+     * Add all user info into externalRegisteredUsers.
+     *
+     * @param request
+     * @return
+     */
     private boolean synchronizeUser(JsonObject request) {
         Gson gson = new GsonBuilder().enableComplexMapKeySerialization().create();
         JsonObject users = (JsonObject) request.get("users");
@@ -150,9 +149,9 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
-        otherServers.put(request.get("id").getAsString(), request);
+        control.getOtherServers().put(request.get("id").getAsString(), request);
         // record each server's timestamp of last SERVER_ANNOUNCE
-        lastAnnounceTimestamps.put(request.get("id").getAsString(), System.currentTimeMillis());
+        control.getLastAnnounceTimestamps().put(request.get("id").getAsString(), System.currentTimeMillis());
         relayMessage(con, request);
 
 //        log.debug(request.get("port").getAsInt());
@@ -177,7 +176,7 @@ public class ControlHelper {
         } else {
             control.addToBeRegisteredUser(request, con);
             lockAllowedCount.put(username, 0);
-            if (otherServers.size() == 0) { // if single server in the system
+            if (control.getOtherServers().size() == 0) { // if single server in the system
                 control.addLocalRegisteredUser(username, secret);
                 return Message.registerSuccess(con, "register success for " + username);
             }
@@ -220,7 +219,7 @@ public class ControlHelper {
                 }
             }
         } else { // locally ALLOWED
-            // 暂时把user信息加入到externalUsers里
+            // temporarily add user info to externalUsers
             control.addExternalRegisteredUser(username, secret);
 
             // relay LOCK_REQUEST to other servers, except which it comes from
@@ -244,9 +243,9 @@ public class ControlHelper {
         }
         lockAllowedCount.put(username, ++count); // local LOCK_ALLOWED count += 1
 
-        // 如果是register所在server
-        // 如果收到了所有server发来的LOCK_ALLOWED，注册成功
-        if (otherServers.size() == lockAllowedCount.get(username)) {
+        // if originally registered server:
+        // if has received LOCK_ALLOWED from all servers，then REGISTER_SUCCESS
+        if (control.getOtherServers().size() == lockAllowedCount.get(username)) {
             for (JsonObject key : control.getToBeRegisteredUsers().keySet()) {
                 Connection c = control.getToBeRegisteredUsers().get(key);
                 if (c != null && username.equals(key.get("username").getAsString())) {
@@ -257,8 +256,8 @@ public class ControlHelper {
             }
         }
 
-        // 如果是中继server
-        // 只对LOCK_REQUEST的来源转发LOCK_ALLOWED
+        // if intermediate server:
+        // relay LOCK_ALLOWED only to the server which LOCK_REQUEST comes from
         if (lockRequestMap.get(username) != null) {
             Connection src = lockRequestMap.get(username);
             src.writeMsg(request.getAsString());
@@ -310,10 +309,10 @@ public class ControlHelper {
                 || externalRegisteredUsers.containsKey(username) && externalRegisteredUsers.get(username).getSecret().equals(secret)) {
             con.setLoggedIn(true);
             Message.loginSuccess(con, "logged in as user " + request.get("username").getAsString());
-            for (String key : otherServers.keySet()) {
-                if (key != null && control.getLoad() - ((Long) otherServers.get(key).get("load").getAsLong()).intValue() >= 2) {
-                    return Message.redirect(con, otherServers.get(key).get("hostname").getAsString(),
-                            "" + otherServers.get(key).get("port").getAsInt());
+            for (String key : control.getOtherServers().keySet()) {
+                if (key != null && control.getLoad() - ((Long) control.getOtherServers().get(key).get("load").getAsLong()).intValue() >= 2) {
+                    return Message.redirect(con, control.getOtherServers().get(key).get("hostname").getAsString(),
+                            "" + control.getOtherServers().get(key).get("port").getAsInt());
                 }
             }
             return false;
@@ -453,11 +452,6 @@ public class ControlHelper {
             }
         }
 
-    }
-
-
-    public Map<String, JsonObject> getOtherServers() {
-        return otherServers;
     }
 
 }

@@ -18,11 +18,16 @@ public class Control extends Thread {
     private static Listener listener;
 
     private static Control control = null;
+    private int load;
+
+    // user data
     private Map<String, User> localRegisteredUsers;
     private Map<JsonObject, Connection> toBeRegisteredUsers;
     private Map<String, User> externalRegisteredUsers;
 
-    private int load;
+    // data from SERVER_ANNOUNCE
+    private Map<String, JsonObject> otherServers; // all external servers
+    private Map<String, Long> lastAnnounceTimestamps;
 
     public static Control getInstance() {
         if (control == null) {
@@ -37,6 +42,8 @@ public class Control extends Thread {
         localRegisteredUsers = new ConcurrentHashMap<>();
         toBeRegisteredUsers = new ConcurrentHashMap<>();
         externalRegisteredUsers = new ConcurrentHashMap<>();
+        otherServers = new ConcurrentHashMap<>();
+        lastAnnounceTimestamps = new ConcurrentHashMap<>();
 
         // start a listener
         try {
@@ -104,7 +111,6 @@ public class Control extends Thread {
 
         // If parent server crashes，then establish new connection to another server (the one with minimum port number)
         if (con.getName().equals(Connection.PARENT)) {
-            Map<String, JsonObject> otherServers = ControlHelper.getInstance().getOtherServers();
 
             // TODO there's a restriction: if the server with minimum port number crashes, then...
             int newRemotePort = minPortOfSystem(otherServers);
@@ -123,8 +129,8 @@ public class Control extends Thread {
 
 
     /**
-     * A new incoming connection has been established, and a reference is returned
-     * to it. 1. remote server -> local server 2. client -> local server
+     * A new incoming connection has been established, and a reference is returned to it.
+     * 1. remote server -> local server 2. client -> local server
      *
      * @param s
      * @return
@@ -228,4 +234,19 @@ public class Control extends Thread {
         return externalRegisteredUsers;
     }
 
+    public Map<String, JsonObject> getOtherServers() {
+        return otherServers;
+    }
+
+    public void setOtherServers(Map<String, JsonObject> otherServers) {
+        this.otherServers = otherServers;
+    }
+
+    public Map<String, Long> getLastAnnounceTimestamps() {
+        return lastAnnounceTimestamps;
+    }
+
+    public void setLastAnnounceTimestamps(Map<String, Long> lastAnnounceTimestamps) {
+        this.lastAnnounceTimestamps = lastAnnounceTimestamps;
+    }
 }
