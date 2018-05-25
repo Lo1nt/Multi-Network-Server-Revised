@@ -83,6 +83,8 @@ public class ControlHelper {
                 return onReceiveActivityMessage(con, request);
             case Message.ACTIVITY_BROADCAST:
                 return onReceiveActivityBroadcast(con, request);
+            case Message.ACK:
+                return onReceiveAck(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);
             case Message.SYNCHRONIZE_USER:
@@ -135,7 +137,6 @@ public class ControlHelper {
 
         con.setConnID(Constant.serverID);
         Constant.serverID += 2;
-        // why
         Constant.clientID -= 2;
         return false;
     }
@@ -209,6 +210,7 @@ public class ControlHelper {
      * @param request
      * @return
      */
+
     private boolean onLockRequest(Connection con, JsonObject request) {
         if (!con.getName().equals(Connection.PARENT) && !con.getName().equals(Connection.CHILD)) {
             return Message.invalidMsg(con, "The connection has not authenticated");
@@ -342,7 +344,7 @@ public class ControlHelper {
 
 
     private boolean onReceiveActivityMessage(Connection con, JsonObject request) {
-        long msgTimeMill = System.currentTimeMillis();
+
         if (!request.has("username")) {
             return Message.invalidMsg(con, "the message did not contain a username");
         }
@@ -368,19 +370,40 @@ public class ControlHelper {
         JsonObject broadcastAct = new JsonObject();
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
-        broadcastAct.addProperty("time", msgTimeMill);
+        broadcastAct.addProperty("time", System.currentTimeMillis());
 
-        relayMessage(con, broadcastAct);
-        clientBroadcast(broadcastAct);
-
+        clientBroadcast(con, broadcastAct);
+        BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
+//        relayMessage(con, broadcastAct);
         return false;
 
     }
 
-
+    /**
+     * @param con
+     * @param msg
+     * @return
+     */
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
+//        BroadcastMessage.getInstance().injectMsg(con, msg);
         relayMessage(con, msg);
-        clientBroadcast(msg);
+        broadcastToClient(msg);
+        Message.returnAck(con, msg);
+        return false;
+    }
+
+    /**
+     * Check whether this msg is from itself or send ack to another one.
+     *
+     * @param con
+     * @return
+     */
+    private boolean onReceiveAck(Connection con, JsonObject request) {
+        // return false if not from itself.
+        if (!BroadcastMessage.getInstance().checkAck(request)) {
+            relayMessage(con, request);
+        }
+
         return false;
     }
 
@@ -390,6 +413,7 @@ public class ControlHelper {
      * @param src
      * @param request
      */
+
     private void relayMessage(Connection src, JsonObject request) {
         for (Connection c : control.getConnections()) {
             if (c.getSocket().getInetAddress() != src.getSocket().getInetAddress()
@@ -399,13 +423,30 @@ public class ControlHelper {
         }
     }
 
+    /**
+     * send message to valid user
+     *
+     * @param broadcastAct
+     */
+    private void clientBroadcast(Connection src, JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() &&
+                    c.getSocket().getInetAddress() != src.getSocket().getInetAddress()) {
+                c.writeMsg(broadcastAct.toString());
+            }
+        }
+
+    }
 
     /**
      * send message to valid user
      *
      * @param broadcastAct
      */
-    private void clientBroadcast(JsonObject broadcastAct) {
+    private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
         broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
