@@ -1,6 +1,5 @@
 package activitystreamer.server;
 
-import activitystreamer.util.Settings;
 import com.google.gson.JsonObject;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -8,11 +7,8 @@ import org.apache.logging.log4j.Logger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class BroadcastMessage {
@@ -23,7 +19,7 @@ public class BroadcastMessage {
     private static ConcurrentLinkedQueue<JsonObject> messageQueue = new ConcurrentLinkedQueue<JsonObject>();
     Map<JsonObject, List<String>> coveredServers = new ConcurrentHashMap<>();
     Map<JsonObject, Connection> linkMsgCon = new ConcurrentHashMap<>();
-
+    Map<JsonObject, List<JsonObject>> waitAck = new ConcurrentHashMap<>();
 
     private BroadcastMessage() {
         control = Control.getInstance();
@@ -39,7 +35,11 @@ public class BroadcastMessage {
                     }
                     JsonObject msg = messageQueue.poll();
                     relayMessage(msg);
-
+                    waitAck.put(msg, new List<JsonObject>);
+                    for (JsonObject message : waitAck) {
+                        List<String> serverList = coveredServers.get(message);
+                        for
+                    }
                 }
             }
 

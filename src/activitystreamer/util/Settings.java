@@ -23,7 +23,6 @@ public class Settings {
 
     // server id.
     private static String serverId;
-    private static int serverIdLength = 26;
     private static final int RANDOM_LENGTH = 26;
     private static String serverSecret = "1";
 
@@ -33,20 +32,20 @@ public class Settings {
 
     public static void setServerId() {
 
-        serverId = generateUniqueId();
+        serverId = localPort + "";
     }
 
-    // generate random String
-    public static String generateUniqueId() {
-        String range = "0123456789abcdefghijklmnopqrstuvwxyz";
-        Random rd = new Random();
-        StringBuffer randomId = new StringBuffer();
-        // randomId.length = 26
-        for (int i = 0; i < serverIdLength; i++) {
-            randomId.append(range.charAt(rd.nextInt(range.length())));
-        }
-        return randomId.toString();
-    }
+//    // generate random String
+//    public static String generateUniqueId() {
+//        String range = "0123456789abcdefghijklmnopqrstuvwxyz";
+//        Random rd = new Random();
+//        StringBuffer randomId = new StringBuffer();
+//        // randomId.length = 26
+//        for (int i = 0; i < serverIdLength; i++) {
+//            randomId.append(range.charAt(rd.nextInt(range.length())));
+//        }
+//        return randomId.toString();
+//    }
 
     public static String generateRandomString() {
         String range = "0123456789abcdefghijklmnopqrstuvwxyz";

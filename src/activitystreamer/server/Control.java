@@ -5,7 +5,6 @@ import java.net.Socket;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-import activitystreamer.Server;
 import activitystreamer.util.*;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
