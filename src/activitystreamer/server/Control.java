@@ -118,6 +118,7 @@ public class Control extends Thread {
                 Settings.setRemotePort(Settings.AUXILIARY_PORT);
                 initiateConnection();
             } else {
+                otherServers.remove(con.getSocket().getPort() + "");
                 int newRemotePort = chooseNewPort(otherServers);
                 if (newRemotePort != -1 && newRemotePort != Settings.getLocalPort()) {
                     Settings.setRemotePort(newRemotePort);
