@@ -149,10 +149,14 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
+        relayMessage(con, request);
+
+        // 记录是从child还是parent传来的
+        request.addProperty("is_subtree", con.getName().equals(Connection.CHILD));
+
         control.getOtherServers().put(request.get("id").getAsString(), request);
         // record each server's timestamp of last SERVER_ANNOUNCE
         control.getLastAnnounceTimestamps().put(request.get("id").getAsString(), System.currentTimeMillis());
-        relayMessage(con, request);
 
 //        log.debug(request.get("port").getAsInt());
 //        log.debug(otherServers);
@@ -367,10 +371,7 @@ public class ControlHelper {
 
         relayMessage(con, broadcastAct);
 
-//        remove time info when broadcast to client
-        username = updateMessageQueue(broadcastAct);
-
-        clientBroadcastFromQueue(username);
+        clientBroadcast(broadcastAct);
         
         /*
         for (Connection c : control.getConnections()) {
@@ -389,9 +390,7 @@ public class ControlHelper {
 //      continue pass this ACTIVITY_BROADCAST to other server
         relayMessage(con, msg);
 
-        String username = updateMessageQueue(msg);
-
-        clientBroadcastFromQueue(username);
+        clientBroadcast(msg);
 
       /*
       for (Connection c : control.getConnections()) {
@@ -419,37 +418,19 @@ public class ControlHelper {
         }
     }
 
-    /**
-     * set up message queue for specific user and return username
-     *
-     * @param msg
-     * @return
-     */
-    private String updateMessageQueue(JsonObject msg) {
-//        String username = msg.get("username").getAsString();
-        String username = msg.get("activity").getAsJsonObject().get("authenticated_user").getAsString(); //TODO check json null
-        Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<>());
-        Constant.messageQueue.get(username).offer(msg);
-        return username;
-    }
-
 
     /**
-     * clean message queue for specific user
+     * sent message to valid user
      *
      * @param username
      */
-    private void clientBroadcastFromQueue(String username) {
-
-        while (!Constant.messageQueue.get(username).isEmpty()) {
-            JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
-            long timeMill = broadcastAct.get("time").getAsLong();
-            broadcastAct.remove("time");
-            for (Connection c : Control.getInstance().getConnections()) {
-                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                        && c.isLoggedIn() && timeMill >= c.getConnTime()) {
-                    c.writeMsg(broadcastAct.toString());
-                }
+    private void clientBroadcast(JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                c.writeMsg(broadcastAct.toString());
             }
         }
 

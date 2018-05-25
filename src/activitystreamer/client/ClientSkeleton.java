@@ -105,7 +105,7 @@ public class ClientSkeleton extends Thread {
             out.flush();
         } else {
             // register
-            Settings.setUserSecret(Settings.genRandomString());
+            Settings.setUserSecret(Settings.generateRandomString());
             System.out.println("ur secret is: " + Settings.getUserSecret());
             out.write(Message.register(Settings.getUsername(), Settings.getUserSecret()) + "\n");
             out.flush();
