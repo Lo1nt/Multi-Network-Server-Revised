@@ -380,7 +380,7 @@ public class ControlHelper {
 
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
         relayMessage(con, msg);
-        clientBroadcast(msg);
+        broadcastToClient(msg);
         return false;
     }
 
@@ -410,8 +410,25 @@ public class ControlHelper {
         broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime()
-            c.getSocket().getInetAddress() != src.getSocket().getInetAddress()){
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() &&
+                    c.getSocket().getInetAddress() != src.getSocket().getInetAddress()) {
+                c.writeMsg(broadcastAct.toString());
+            }
+        }
+
+    }
+
+    /**
+     * send message to valid user
+     *
+     * @param broadcastAct
+     */
+    private void broadcastToClient(JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
                 c.writeMsg(broadcastAct.toString());
             }
         }
