@@ -367,10 +367,7 @@ public class ControlHelper {
 
         relayMessage(con, broadcastAct);
 
-//        remove time info when broadcast to client
-        username = updateMessageQueue(broadcastAct);
-
-        clientBroadcastFromQueue(username);
+        clientBroadcast(broadcastAct);
         
         /*
         for (Connection c : control.getConnections()) {
@@ -389,9 +386,7 @@ public class ControlHelper {
 //      continue pass this ACTIVITY_BROADCAST to other server
         relayMessage(con, msg);
 
-        String username = updateMessageQueue(msg);
-
-        clientBroadcastFromQueue(username);
+        clientBroadcast(msg);
 
       /*
       for (Connection c : control.getConnections()) {
@@ -419,37 +414,19 @@ public class ControlHelper {
         }
     }
 
-    /**
-     * set up message queue for specific user and return username
-     *
-     * @param msg
-     * @return
-     */
-    private String updateMessageQueue(JsonObject msg) {
-//        String username = msg.get("username").getAsString();
-        String username = msg.get("activity").getAsJsonObject().get("authenticated_user").getAsString(); //TODO check json null
-        Constant.messageQueue.putIfAbsent(username, new ConcurrentLinkedQueue<>());
-        Constant.messageQueue.get(username).offer(msg);
-        return username;
-    }
-
 
     /**
-     * clean message queue for specific user
+     * sent message to valid user
      *
      * @param username
      */
-    private void clientBroadcastFromQueue(String username) {
-
-        while (!Constant.messageQueue.get(username).isEmpty()) {
-            JsonObject broadcastAct = Constant.messageQueue.get(username).poll();
-            long timeMill = broadcastAct.get("time").getAsLong();
-            broadcastAct.remove("time");
-            for (Connection c : Control.getInstance().getConnections()) {
-                if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                        && c.isLoggedIn() && timeMill >= c.getConnTime()) {
-                    c.writeMsg(broadcastAct.toString());
-                }
+    private void clientBroadcast(JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                c.writeMsg(broadcastAct.toString());
             }
         }
 
