@@ -30,7 +30,8 @@ public class BroadcastMessage {
     private Map<JsonObject, List<String>> snapshotOtherServers = new ConcurrentHashMap<>();
     // work with coveredServers
     public Map<JsonObject, List<String>> remainOtherServers = new ConcurrentHashMap<>();
-//    private List<String> renewServerList =Collections.synchronizedList(new ArrayList<>());
+
+    //    private List<String> renewServerList =Collections.synchronizedList(new ArrayList<>());
     private BroadcastMessage() {
         control = Control.getInstance();
         new Thread(new Runnable() {
@@ -47,66 +48,77 @@ public class BroadcastMessage {
                     relayMessage(msg);
                     waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
 
-
-                    for (JsonObject message : coveredServers.keySet()) {
-                        List<String> serverList = remainOtherServers.get(msg);
-                        List<String> coveredList = coveredServers.get(msg);
+                    // simple one, but robust.
+                    for (JsonObject message : snapshotOtherServers.keySet()) {
+                        List<String> ackList = waitAck.get(message);
+                        List<String> snapList = snapshotOtherServers.get(message);
                         boolean flag = true;
-                        for (String serverId : serverList) {
-                            if (!coveredList.contains(serverId)) {
+                        for (String serverId : snapList) {
+                            if (!ackList.contains(serverId)) {
                                 flag = false;
                                 break;
                             }
                         }
-                        if (flag == true) {
-                            Message.broadCastSuccess(linkMsgCon.get(msg), msg);
-                            remainOtherServers.remove(msg);
-                            coveredServers.remove(msg);
+                        if (!flag) {
+                            relayMessage(message);
+                        }
+                        else{
+                            Message.broadCastSuccess(linkMsgCon.get(message), message);
+                            waitAck.remove(message);
+                            snapshotOtherServers.remove(message);
+                            waitAck.remove(message)
                         }
                     }
-
-                    for (JsonObject message : waitAck.keySet()) {
-                        List<String> serverList = snapshotOtherServers.get(msg);
-                        List<String> coveredList = waitAck.get(msg);
-                        boolean flag = true;
-                        for (String serverId : serverList) {
-                            if (!coveredList.contains(serverId)) {
-                                flag = false;
-                                break;
-                            }
-                        }
-                        if (flag == true) {
-                            Message.broadCastSuccess(linkMsgCon.get(msg), msg);
-                            linkMsgCon.remove(msg);
-                            snapshotOtherServers.remove(msg);
-                            waitAck.remove(msg);
-                        } else {
-                            List<String> remainList = remainOtherServers.get(msg);
-                            // if some crashes, flag = true
-                            flag = true;
-                            // if connect new servers, flag_reconnect = true.
-                            boolean flag_reconnect = true;
-                            // TODO if the servers crashed reconnect, no matter how many, send the msg.
-                            // For now, only take one situation into consideration, which is when all crashed servers r back,
-                            // then we send the msg.
-                            for (String serverId : serverList) {
-                                if (!remainList.contains(serverId)) {
-                                    flag = false;
-                                }
-                                if(!Control.getInstance().getOtherServers().containsKey(serverId)){
-                                    // may break.
-                                    flag_reconnect = false;
-                                }
-                            }
-                            // some severs crashed. and all reconnect. send the msg again to these servers.
-                            if (!flag && flag_reconnect) {
-                                // broadcast again.
-                                // TODO those who have received once, they don't have to receive again.
-                                // TODO do this by adding id.
-                                relayMessage(message);
-                            }
-                        }
-                    }
+//                    This one is complex. enhance when got time.
+//                    for (JsonObject message : waitAck.keySet()) {
+//                        List<String> serverList = snapshotOtherServers.get(msg);
+//                        List<String> coveredList = waitAck.get(msg);
+//                        boolean flag = true;
+//                        for (String serverId : serverList) {
+//                            if (!coveredList.contains(serverId)) {
+//                                flag = false;
+//                                break;
+//                            }
+//                        }
+//                        if (flag == true) {
+//                            Message.broadCastSuccess(linkMsgCon.get(msg), msg);
+//                            linkMsgCon.remove(msg);
+//                            snapshotOtherServers.remove(msg);
+//                            waitAck.remove(msg);
+//                        } else {
+//                            List<String> remainList = remainOtherServers.get(msg);
+//
+//                            // if connect new servers, flag_reconnect = true.
+//                            boolean flag_reconnect = true;
+//                            // TODO if the crashed servers  reconnect, no matter how many, send the msg.
+//                            // TODO when server in snapshotOtherServers, in otherServers but not in remainOtherServers,
+//                            // TODO means this server is reconnected, then add it to remainOtherServer.
+//                            // For now, only take one situation into consideration, which is when all crashed servers r back,
+//                            // then we send the msg.
+//                            for (String serverId : serverList) {
+//                                // if one in snapshot, not in remain, flag = false
+//                                flag = true;
+//                                if (!remainList.contains(serverId)) {
+//                                    flag = false;
+//                                }
+//                                // if one in snapshot, not in otherServer, flag = True. means it isn't reconnected yet.
+//                                flag_reconnect = true;
+//                                if (!Control.getInstance().getOtherServers().containsKey(serverId)) {
+//                                    // may break.
+//                                    flag_reconnect = false;
+//                                }
+//                                if (!flag && flag_reconnect) {
+//                                    relayMessage(message);
+//                                }
+//                            }
+//                            // some severs crashed. and all reconnect. send the msg again to these servers.
+//                            if (!flag && flag_reconnect) {
+//                                // broadcast again.
+//                                // TODO those who have received once, they don't have to receive again.
+//                                // TODO do this by adding id.
+//                            }
+//                        }
+//                    }
                 }
             }
 
