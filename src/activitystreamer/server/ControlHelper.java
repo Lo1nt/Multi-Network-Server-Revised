@@ -42,8 +42,12 @@ public class ControlHelper {
                         if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
                             control.getOtherServers().remove(entry.getKey());
                             control.getLastAnnounceTimestamps().remove(entry.getKey());
-
+                            // update remainOtherServers in BroadcastMessage
+                            if (BroadcastMessage.getInstance().remainOtherServers.containsKey(entry.getKey())) {
+                                BroadcastMessage.getInstance().remainOtherServers.remove(entry.getKey());
+                            }
                         }
+
                     }
                 }
             }
