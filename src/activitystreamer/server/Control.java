@@ -117,6 +117,7 @@ public class Control extends Thread {
 
         // If parent server crashes，then establish new connection to another server (the one having connections to other servers)
         if (con.getName().equals(Connection.PARENT)) {
+            log.debug(otherServers.get(con.getSocket().getPort() + ""));
             int parentCount = otherServers.get(con.getSocket().getPort() + "").getAsJsonObject().get("parent_count").getAsInt();
             if (parentCount == 0) { // 如果是root节点挂了，单独处理:
                 // requires running a backup server, port: 3779
@@ -213,7 +214,7 @@ public class Control extends Thread {
             try {
                 Thread.sleep(Settings.getActivityInterval());
             } catch (InterruptedException e) {
-                log.info("received an interrupt, system is shutting down");
+                log.info("received an interrupt");
 //                break;
             }
 

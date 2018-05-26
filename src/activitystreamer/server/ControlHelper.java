@@ -12,6 +12,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +25,8 @@ public class ControlHelper {
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
     private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
+
+    Map<JsonObject, List<Connection>> linkMsgCon = new ConcurrentHashMap<>();
 
     private ControlHelper() {
         control = Control.getInstance();
@@ -86,7 +91,7 @@ public class ControlHelper {
                 return onReceiveActivityMessage(con, request);
             case Message.ACTIVITY_BROADCAST:
                 return onReceiveActivityBroadcast(con, request);
-            case Message.BROADCAST_ACKNOWLEDGE:
+            case Message.BROADCAST_ACK:
                 return onReceiveAck(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);
@@ -410,16 +415,23 @@ public class ControlHelper {
 
         // BroadcastMessage.getInstance().injectMsg(con, msg);
         // if not received this msg, return ack and broadcast to clients.
-
-        if (!receivedMsg.containsKey(msg)) {
-
-            receivedMsg.put(msg, new String());
-            relayMessage(con, msg);
-            broadcastToClient(msg);
-            Message.returnAck(con, msg);
-        } else {
-            relayMessage(con, msg);
+        String timestamp = msg.get("time").getAsString();
+        for (JsonObject message : receivedMsg.keySet()) {
+//            System.out.println(message.toString());
+            String waitTime = message.get("time").getAsString();
+            if (waitTime.equals(timestamp)) {
+//                broadcastToClient(msg);
+                relayMessage(con, msg);
+//                Message.returnAck(con, msg);
+                return false;
+            }
         }
+
+        receivedMsg.put(msg, new String());
+        relayMessage(con, msg);
+        broadcastToClient(msg);
+        Message.returnAck(con, msg);
+
         return false;
     }
 
@@ -456,7 +468,6 @@ public class ControlHelper {
     }
 
 
-
     /**
      * send message to valid user
      *
@@ -464,15 +475,22 @@ public class ControlHelper {
      */
     private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
+        List<Connection> connectionsList = Collections.synchronizedList(new ArrayList<>());
         broadcastAct.remove("time");
+        if (linkMsgCon.containsKey(broadcastAct)) {
+            connectionsList = linkMsgCon.get(broadcastAct);
+        } else {
+            linkMsgCon.put(broadcastAct, connectionsList);
+        }
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() && !connectionsList.contains(c)) {
+                connectionsList.add(c);
+                linkMsgCon.put(broadcastAct, connectionsList);
                 c.writeMsg(broadcastAct.toString());
             }
         }
         broadcastAct.addProperty("time", timeMill);
-
     }
 
     /**

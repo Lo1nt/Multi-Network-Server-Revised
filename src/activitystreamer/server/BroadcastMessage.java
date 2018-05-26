@@ -70,6 +70,7 @@ public class BroadcastMessage {
                             }
                         }
                         if (!flag) {
+//                            System.out.println("resend message");
                             relayMessage(message);
                         } else {
                             System.out.println("success");
