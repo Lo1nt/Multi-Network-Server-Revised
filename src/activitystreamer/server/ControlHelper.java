@@ -425,6 +425,7 @@ public class ControlHelper {
         } else {
             broadcastToClient(msg);
             relayMessage(con, msg);
+            Message.returnAck(con, msg);
         }
         return false;
     }
