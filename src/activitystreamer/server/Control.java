@@ -213,7 +213,7 @@ public class Control extends Thread {
             try {
                 Thread.sleep(Settings.getActivityInterval());
             } catch (InterruptedException e) {
-                log.info("received an interrupt, system is shutting down");
+                log.info("received an interrupt");
 //                break;
             }
 
