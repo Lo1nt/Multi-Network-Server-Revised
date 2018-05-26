@@ -26,7 +26,7 @@ public class ControlHelper {
     private Map<String, Connection> lockRequestMap; // username, source port
     private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
 
-    Map<JsonObject, List<Connection>> linkMsgCon = new ConcurrentHashMap<>();
+//    Map<JsonObject, List<Connection>> linkMsgCon = new ConcurrentHashMap<>();
 
     private ControlHelper() {
         control = Control.getInstance();
@@ -475,18 +475,18 @@ public class ControlHelper {
      */
     private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
-        List<Connection> connectionsList = Collections.synchronizedList(new ArrayList<>());
+//        List<Connection> connectionsList = Collections.synchronizedList(new ArrayList<>());
         broadcastAct.remove("time");
-        if (linkMsgCon.containsKey(broadcastAct)) {
-            connectionsList = linkMsgCon.get(broadcastAct);
-        } else {
-            linkMsgCon.put(broadcastAct, connectionsList);
-        }
+//        if (linkMsgCon.containsKey(broadcastAct)) {
+//            connectionsList = linkMsgCon.get(broadcastAct);
+//        } else {
+//            linkMsgCon.put(broadcastAct, connectionsList);
+//        }
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime() && !connectionsList.contains(c)) {
-                connectionsList.add(c);
-                linkMsgCon.put(broadcastAct, connectionsList);
+                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+//                connectionsList.add(c);
+//                linkMsgCon.put(broadcastAct, connectionsList);
                 c.writeMsg(broadcastAct.toString());
             }
         }
