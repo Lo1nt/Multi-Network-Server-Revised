@@ -63,7 +63,13 @@ public class Control extends Thread {
             } catch (IOException e) {
                 log.error("failed to make connection to " + Settings.getRemoteHostname() + ":"
                         + Settings.getRemotePort() + " :" + e);
-                System.exit(-1);
+//                System.exit(-1);
+                try {
+                    Thread.sleep(1000);
+                    initiateConnection();
+                } catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
             }
         }
     }
@@ -208,7 +214,7 @@ public class Control extends Thread {
                 Thread.sleep(Settings.getActivityInterval());
             } catch (InterruptedException e) {
                 log.info("received an interrupt, system is shutting down");
-                break;
+//                break;
             }
 
         }
