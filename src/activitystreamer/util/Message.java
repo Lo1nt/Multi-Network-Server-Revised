@@ -91,6 +91,7 @@ public class Message {
         json.addProperty("child_count", childCount);
         json.addProperty("hostname", Settings.getLocalHostname());
         json.addProperty("port", Settings.getLocalPort());
+        json.addProperty("relay_count", 0);
         con.writeMsg(gson.toJson(json));
     }
 

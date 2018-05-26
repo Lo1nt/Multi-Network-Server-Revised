@@ -131,9 +131,9 @@ public class Control extends Thread {
     private int chooseNewPort(Map<String, JsonObject> otherServers) {
         Collection<JsonObject> values = otherServers.values();
         for (JsonObject jo : values) {
-            int serverCount = jo.get("server_count").getAsInt(); //TODO
-            // if the server has connections, and server is not among subtree
-            if (serverCount > 0 && !jo.get("is_subtree").getAsBoolean()) {
+//            int serverCount = jo.get("server_count").getAsInt(); //TODO
+            // if server is not among subtree
+            if (!jo.get("is_subtree").getAsBoolean() && jo.get("relay_count").getAsInt() == 1 && jo.get("relay_from_parent").getAsBoolean()) {
                 return jo.get("port").getAsInt();
             }
         }
