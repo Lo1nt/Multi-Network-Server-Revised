@@ -415,18 +415,27 @@ public class ControlHelper {
 
         // BroadcastMessage.getInstance().injectMsg(con, msg);
         // if not received this msg, return ack and broadcast to clients.
+        String timestamp = msg.get("time").getAsString();
+        boolean flag = true;
+        for (JsonObject message : receivedMsg.keySet()) {
+//            System.out.println(message.toString());
+            String waitTime = message.get("time").getAsString();
+            if (waitTime.equals(timestamp)) {
+                broadcastToClient(msg);
+                relayMessage(con, msg);
+                Message.returnAck(con, msg);
+                flag = false;
+                break;
+            }
+        }
 
-        if (!receivedMsg.containsKey(msg)) {
-
+        if (flag) {
             receivedMsg.put(msg, new String());
             relayMessage(con, msg);
             broadcastToClient(msg);
             Message.returnAck(con, msg);
-        } else {
-            broadcastToClient(msg);
-            relayMessage(con, msg);
-            Message.returnAck(con, msg);
         }
+
         return false;
     }
 
@@ -482,7 +491,7 @@ public class ControlHelper {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                     && c.isLoggedIn() && timeMill >= c.getConnTime() && !connectionsList.contains(c)) {
                 connectionsList.add(c);
-                linkMsgCon.put(broadcastAct,connectionsList);
+                linkMsgCon.put(broadcastAct, connectionsList);
                 c.writeMsg(broadcastAct.toString());
             }
         }
