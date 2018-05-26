@@ -427,7 +427,7 @@ public class ControlHelper {
     private boolean onReceiveAck(Connection con, JsonObject request) {
         // return false if not from itself.
         if (!BroadcastMessage.getInstance().checkAck(request)) {
-            JsonObject msg = request.getAsJsonObject("msg");
+//            JsonObject msg = request.getAsJsonObject("msg");
             relayMessage(con, request);
         }
 
@@ -449,6 +449,7 @@ public class ControlHelper {
             }
         }
     }
+
 
 
     /**

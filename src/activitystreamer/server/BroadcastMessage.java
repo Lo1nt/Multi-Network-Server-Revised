@@ -48,11 +48,15 @@ public class BroadcastMessage {
                     }
                     msg = messageQueue.poll();
                     if (msg != null) {
+                        System.out.println("msg from queue");
+                        System.out.println(msg.toString());
                         relayMessage(msg);
                         waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
+                        if (waitAck.containsKey(msg)) {
+                            System.out.println("waitack got the msg");
 
+                        }
                         // simple one, but robust.
-
                     }
                     for (JsonObject message : snapshotOtherServers.keySet()) {
                         List<String> ackList = waitAck.get(message);
@@ -61,7 +65,7 @@ public class BroadcastMessage {
                         for (String serverId : snapList) {
                             if (!ackList.contains(serverId)) {
                                 flag = false;
-                                System.out.println("break");
+//                                System.out.println("break");
                                 break;
                             }
                         }
@@ -139,7 +143,7 @@ public class BroadcastMessage {
 
     public void injectMsg(Connection con, JsonObject msg) {
 //        coveredServers.put(msg, Collections.synchronizedList(new ArrayList<>()));
-
+        System.out.println(msg.toString());
         linkMsgCon.put(msg, con);
         messageQueue.offer(msg);
         List<String> tmp = new ArrayList<>(Control.getInstance().getOtherServers().keySet());
@@ -150,17 +154,28 @@ public class BroadcastMessage {
 
     public boolean checkAck(JsonObject request) {
         JsonObject msg = (JsonObject) request.get("msg");
+        String timestamp = msg.get("time").getAsString();
+        System.out.println(msg.toString());
         String serverId = request.get("from").getAsString();
         System.out.println("check ack");
-        if (waitAck.containsKey(msg)) {
-            System.out.println("have that msg");
-
-            if (waitAck.get(msg).contains(serverId)) {
-                waitAck.get(msg).add(serverId);
-                System.out.println("add ack");
+        for (JsonObject message : waitAck.keySet()) {
+//            System.out.println(message.toString());
+            String waitTime = message.get("time").getAsString();
+            if (waitTime.equals(timestamp)) {
+                waitAck.get(message).add(serverId);
+                return true;
             }
-            return true;
         }
+
+//        if (waitAck.containsKey(msg)) {
+//            System.out.println("have that msg");
+//
+//            if (waitAck.get(msg).contains(serverId)) {
+//                waitAck.get(msg).add(serverId);
+//                System.out.println("add ack");
+//            }
+//            return true;
+//        }
         return false;
     }
 
