@@ -34,21 +34,26 @@ public class BroadcastMessage {
     //    private List<String> renewServerList =Collections.synchronizedList(new ArrayList<>());
     private BroadcastMessage() {
         control = Control.getInstance();
+
         new Thread(new Runnable() {
 
             @Override
             public void run() {
+                JsonObject msg;
                 while (true) {
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    JsonObject msg = messageQueue.poll();
-                    relayMessage(msg);
-                    waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
+                    msg = messageQueue.poll();
+                    if (msg != null) {
+                        relayMessage(msg);
+                        waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
 
-                    // simple one, but robust.
+                        // simple one, but robust.
+
+                    }
                     for (JsonObject message : snapshotOtherServers.keySet()) {
                         List<String> ackList = waitAck.get(message);
                         List<String> snapList = snapshotOtherServers.get(message);
@@ -63,9 +68,9 @@ public class BroadcastMessage {
                             relayMessage(message);
                         } else {
                             Message.broadCastSuccess(linkMsgCon.get(message), message);
-                            waitAck.remove(message);
-                            snapshotOtherServers.remove(message);
-                            waitAck.remove(message);
+//                            waitAck.remove(message);
+//                            snapshotOtherServers.remove(message);
+//                            waitAck.remove(message);
                         }
                     }
 //                    This one is complex. enhance when got time.
@@ -133,6 +138,7 @@ public class BroadcastMessage {
 
     public void injectMsg(Connection con, JsonObject msg) {
 //        coveredServers.put(msg, Collections.synchronizedList(new ArrayList<>()));
+
         linkMsgCon.put(msg, con);
         messageQueue.offer(msg);
         List<String> tmp = new ArrayList<>(Control.getInstance().getOtherServers().keySet());

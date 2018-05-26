@@ -393,7 +393,7 @@ public class ControlHelper {
         
         BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
         broadcastToClient(con, broadcastAct);
-        
+        System.out.println(broadcastAct.get("time"));
 //        relayMessage(con, broadcastAct);
         return false;
 
@@ -458,7 +458,7 @@ public class ControlHelper {
      */
     private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
-        broadcastAct.remove("time");
+//        broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                     && c.isLoggedIn() && timeMill >= c.getConnTime()) {
@@ -474,7 +474,7 @@ public class ControlHelper {
      */
     private void broadcastToClient(Connection src, JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
-        broadcastAct.remove("time");
+//        broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                     && c.isLoggedIn() && timeMill >= c.getConnTime() &&
