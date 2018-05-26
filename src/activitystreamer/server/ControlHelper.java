@@ -22,7 +22,7 @@ public class ControlHelper {
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
     private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
-
+    
     private ControlHelper() {
         control = Control.getInstance();
         lockAllowedCount = new ConcurrentHashMap<>();
