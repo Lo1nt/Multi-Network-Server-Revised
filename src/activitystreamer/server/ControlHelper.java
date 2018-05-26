@@ -416,7 +416,6 @@ public class ControlHelper {
         // BroadcastMessage.getInstance().injectMsg(con, msg);
         // if not received this msg, return ack and broadcast to clients.
         String timestamp = msg.get("time").getAsString();
-        boolean flag = true;
         for (JsonObject message : receivedMsg.keySet()) {
 //            System.out.println(message.toString());
             String waitTime = message.get("time").getAsString();
@@ -424,17 +423,14 @@ public class ControlHelper {
 //                broadcastToClient(msg);
                 relayMessage(con, msg);
 //                Message.returnAck(con, msg);
-                flag = false;
-                break;
+                return false;
             }
         }
 
-        if (flag) {
-            receivedMsg.put(msg, new String());
-            relayMessage(con, msg);
-            broadcastToClient(msg);
-            Message.returnAck(con, msg);
-        }
+        receivedMsg.put(msg, new String());
+        relayMessage(con, msg);
+        broadcastToClient(msg);
+        Message.returnAck(con, msg);
 
         return false;
     }
@@ -495,7 +491,6 @@ public class ControlHelper {
             }
         }
         broadcastAct.addProperty("time", timeMill);
-
     }
 
     /**
