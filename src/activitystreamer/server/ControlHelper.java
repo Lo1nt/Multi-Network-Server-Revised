@@ -86,7 +86,7 @@ public class ControlHelper {
                 return onReceiveActivityMessage(con, request);
             case Message.ACTIVITY_BROADCAST:
                 return onReceiveActivityBroadcast(con, request);
-            case Message.BROADCAST_ACKNOWLEDGE:
+            case Message.BROADCAST_ACK:
                 return onReceiveAck(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);

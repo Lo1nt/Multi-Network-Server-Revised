@@ -25,7 +25,7 @@ public class Message {
     public static final String LOCK_DENIED = "LOCK_DENIED";
     public static final String LOCK_ALLOWED = "LOCK_ALLOWED";
     public static final String SYNCHRONIZE_USER = "SYNCHRONIZE_USER";
-    public static final String BROADCAST_ACKNOWLEDGE = "BROADCAST_ACKNOWLEDGE";
+    public static final String BROADCAST_ACK = "BROADCAST_ACK";
     public static final String BROADCAST_SUCCESS = "BROADCAST_SUCCESS";
 
 
@@ -49,7 +49,7 @@ public class Message {
     public synchronized static boolean returnAck(Connection con, JsonObject msg) {
         System.out.println("send ack");
         JsonObject json = new JsonObject();
-        json.addProperty("command", Message.BROADCAST_ACKNOWLEDGE);
+        json.addProperty("command", Message.BROADCAST_ACK);
         json.add("msg", msg);
         json.addProperty("from", Settings.getServerId());
         con.writeMsg(new Gson().toJson(json));
