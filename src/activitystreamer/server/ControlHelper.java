@@ -423,6 +423,7 @@ public class ControlHelper {
             broadcastToClient(msg);
             Message.returnAck(con, msg);
         } else {
+            broadcastToClient(msg);
             relayMessage(con, msg);
         }
         return false;
@@ -468,19 +469,19 @@ public class ControlHelper {
      */
     private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
+        List<Connection> connectionsList = Collections.synchronizedList(new ArrayList<>());
+        ;
         broadcastAct.remove("time");
+        if (linkMsgCon.containsKey(broadcastAct)) {
+            connectionsList = linkMsgCon.get(broadcastAct);
+        } else {
+            linkMsgCon.put(broadcastAct, connectionsList);
+        }
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
-                List<Connection> connectionsList;
-                if (!linkMsgCon.containsKey(broadcastAct)) {
-                    connectionsList = Collections.synchronizedList(new ArrayList<>());
-                } else {
-                    connectionsList = linkMsgCon.get(broadcastAct);
-                }
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() && !connectionsList.contains(c)) {
                 connectionsList.add(c);
-
-                linkMsgCon.put()
+                linkMsgCon.put(broadcastAct,connectionsList);
                 c.writeMsg(broadcastAct.toString());
             }
         }
