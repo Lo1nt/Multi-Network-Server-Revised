@@ -156,7 +156,23 @@ public class ControlHelper {
         if (request.get("id") == null) {
             return Message.invalidMsg(con, "message doesn't contain a server id");
         }
-        relayMessage(con, request);
+//        relayMessage(con, request);
+
+        int relayCount = request.get("relay_count").getAsInt();
+        // relay
+        for (Connection c : control.getConnections()) {
+            if (c.getSocket().getInetAddress() != con.getSocket().getInetAddress()
+                    && (c.getName().equals(Connection.PARENT) || c.getName().equals(Connection.CHILD))) {
+//                if (con.getName().equals())
+                request.addProperty("relay_from_parent", con.getName().equals(Connection.PARENT));
+                request.addProperty("relay_count", relayCount + 1);
+                c.writeMsg(request.toString());
+                request.addProperty("relay_count", relayCount);
+            }
+        }
+
+//        log.debug(request);
+
 
         // 记录是从child还是parent传来的
         request.addProperty("is_subtree", con.getName().equals(Connection.CHILD));

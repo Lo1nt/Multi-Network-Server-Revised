@@ -31,8 +31,8 @@ public class Settings {
     private static String username = "anonymous";
 
     public static void setServerId() {
-
         serverId = localPort + "";
+//        serverId = generateUniqueId();
     }
 
 //    // generate random String
