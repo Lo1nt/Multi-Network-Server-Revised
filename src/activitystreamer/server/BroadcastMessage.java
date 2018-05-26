@@ -68,9 +68,9 @@ public class BroadcastMessage {
                             relayMessage(message);
                         } else {
                             Message.broadCastSuccess(linkMsgCon.get(message), message);
-//                            waitAck.remove(message);
-//                            snapshotOtherServers.remove(message);
-//                            waitAck.remove(message);
+                            waitAck.remove(message);
+                            snapshotOtherServers.remove(message);
+                            waitAck.remove(message);
                         }
                     }
 //                    This one is complex. enhance when got time.
