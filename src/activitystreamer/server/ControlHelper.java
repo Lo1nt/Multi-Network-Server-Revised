@@ -12,6 +12,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,6 +25,8 @@ public class ControlHelper {
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
     private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
+
+    Map<JsonObject, List<Connection>> linkMsgCon = new ConcurrentHashMap<>();
 
     private ControlHelper() {
         control = Control.getInstance();
@@ -418,6 +423,7 @@ public class ControlHelper {
             broadcastToClient(msg);
             Message.returnAck(con, msg);
         } else {
+            broadcastToClient(msg);
             relayMessage(con, msg);
         }
         return false;
@@ -456,7 +462,6 @@ public class ControlHelper {
     }
 
 
-
     /**
      * send message to valid user
      *
@@ -464,10 +469,19 @@ public class ControlHelper {
      */
     private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
+        List<Connection> connectionsList = Collections.synchronizedList(new ArrayList<>());
+        ;
         broadcastAct.remove("time");
+        if (linkMsgCon.containsKey(broadcastAct)) {
+            connectionsList = linkMsgCon.get(broadcastAct);
+        } else {
+            linkMsgCon.put(broadcastAct, connectionsList);
+        }
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() && !connectionsList.contains(c)) {
+                connectionsList.add(c);
+                linkMsgCon.put(broadcastAct,connectionsList);
                 c.writeMsg(broadcastAct.toString());
             }
         }
