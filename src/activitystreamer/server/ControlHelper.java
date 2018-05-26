@@ -388,7 +388,7 @@ public class ControlHelper {
      * @return
      */
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
-//        BroadcastMessage.getInstance().injectMsg(con, msg);
+        // BroadcastMessage.getInstance().injectMsg(con, msg);
         // if not received this msg, return ack and broadcast to clients.
         if (!receivedMsg.containsKey(msg)) {
             receivedMsg.put(msg, new String());
