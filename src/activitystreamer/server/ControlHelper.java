@@ -12,6 +12,9 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -22,7 +25,9 @@ public class ControlHelper {
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
     private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
-    
+
+    Map<JsonObject, List<Connection>> linkMsgCon = new ConcurrentHashMap<>();
+
     private ControlHelper() {
         control = Control.getInstance();
         lockAllowedCount = new ConcurrentHashMap<>();
@@ -456,7 +461,6 @@ public class ControlHelper {
     }
 
 
-
     /**
      * send message to valid user
      *
@@ -468,6 +472,15 @@ public class ControlHelper {
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                     && c.isLoggedIn() && timeMill >= c.getConnTime()) {
+                List<Connection> connectionsList;
+                if (!linkMsgCon.containsKey(broadcastAct)) {
+                    connectionsList = Collections.synchronizedList(new ArrayList<>());
+                } else {
+                    connectionsList = linkMsgCon.get(broadcastAct);
+                }
+                connectionsList.add(c);
+
+                linkMsgCon.put()
                 c.writeMsg(broadcastAct.toString());
             }
         }
