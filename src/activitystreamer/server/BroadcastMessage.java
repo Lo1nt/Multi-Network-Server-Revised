@@ -73,7 +73,7 @@ public class BroadcastMessage {
                             relayMessage(message);
                         } else {
                             System.out.println("success");
-                            Message.broadCastSuccess(linkMsgCon.get(message), message);
+                            Message.broadcastSuccess(linkMsgCon.get(message), message);
                             waitAck.remove(message);
                             snapshotOtherServers.remove(message);
                         }
@@ -90,7 +90,7 @@ public class BroadcastMessage {
 //                            }
 //                        }
 //                        if (flag == true) {
-//                            Message.broadCastSuccess(linkMsgCon.get(msg), msg);
+//                            Message.broadcastSuccess(linkMsgCon.get(msg), msg);
 //                            linkMsgCon.remove(msg);
 //                            snapshotOtherServers.remove(msg);
 //                            waitAck.remove(msg);

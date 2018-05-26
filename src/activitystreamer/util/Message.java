@@ -38,7 +38,7 @@ public class Message {
         return false;
     }
 
-    public synchronized static void broadCastSuccess(Connection con, JsonObject msg) {
+    public synchronized static void broadcastSuccess(Connection con, JsonObject msg) {
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.BROADCAST_SUCCESS);
         json.add("msg", msg);
