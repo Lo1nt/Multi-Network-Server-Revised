@@ -288,7 +288,7 @@ public class ControlHelper {
         // relay LOCK_ALLOWED only to the server which LOCK_REQUEST comes from
         if (lockRequestMap.get(username) != null) {
             Connection src = lockRequestMap.get(username);
-            src.writeMsg(request.getAsString());
+            src.writeMsg(new Gson().toJson(request));
         }
 
         return false;
