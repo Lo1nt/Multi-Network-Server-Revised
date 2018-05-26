@@ -34,21 +34,30 @@ public class BroadcastMessage {
     //    private List<String> renewServerList =Collections.synchronizedList(new ArrayList<>());
     private BroadcastMessage() {
         control = Control.getInstance();
+
         new Thread(new Runnable() {
 
             @Override
             public void run() {
+                JsonObject msg;
                 while (true) {
                     try {
                         Thread.sleep(1000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
-                    JsonObject msg = messageQueue.poll();
-                    relayMessage(msg);
-                    waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
+                    msg = messageQueue.poll();
+                    if (msg != null) {
+                        System.out.println("msg from queue");
+                        System.out.println(msg.toString());
+                        relayMessage(msg);
+                        waitAck.put(msg, Collections.synchronizedList(new ArrayList<>()));
+                        if (waitAck.containsKey(msg)) {
+                            System.out.println("waitack got the msg");
 
-                    // simple one, but robust.
+                        }
+                        // simple one, but robust.
+                    }
                     for (JsonObject message : snapshotOtherServers.keySet()) {
                         List<String> ackList = waitAck.get(message);
                         List<String> snapList = snapshotOtherServers.get(message);
@@ -56,16 +65,17 @@ public class BroadcastMessage {
                         for (String serverId : snapList) {
                             if (!ackList.contains(serverId)) {
                                 flag = false;
+//                                System.out.println("break");
                                 break;
                             }
                         }
                         if (!flag) {
                             relayMessage(message);
                         } else {
+                            System.out.println("success");
                             Message.broadCastSuccess(linkMsgCon.get(message), message);
                             waitAck.remove(message);
                             snapshotOtherServers.remove(message);
-                            waitAck.remove(message);
                         }
                     }
 //                    This one is complex. enhance when got time.
@@ -133,22 +143,39 @@ public class BroadcastMessage {
 
     public void injectMsg(Connection con, JsonObject msg) {
 //        coveredServers.put(msg, Collections.synchronizedList(new ArrayList<>()));
+        System.out.println(msg.toString());
         linkMsgCon.put(msg, con);
         messageQueue.offer(msg);
         List<String> tmp = new ArrayList<>(Control.getInstance().getOtherServers().keySet());
+        // may use deep copy.
         snapshotOtherServers.put(msg, tmp);
 //        remainOtherServers.put(msg, tmp);
     }
 
     public boolean checkAck(JsonObject request) {
         JsonObject msg = (JsonObject) request.get("msg");
+        String timestamp = msg.get("time").getAsString();
+        System.out.println(msg.toString());
         String serverId = request.get("from").getAsString();
-        if (waitAck.containsKey(msg)) {
-            if (waitAck.get(msg).contains(serverId)) {
-                waitAck.get(msg).add(serverId);
+        System.out.println("check ack");
+        for (JsonObject message : waitAck.keySet()) {
+//            System.out.println(message.toString());
+            String waitTime = message.get("time").getAsString();
+            if (waitTime.equals(timestamp)) {
+                waitAck.get(message).add(serverId);
+                return true;
             }
-            return true;
         }
+
+//        if (waitAck.containsKey(msg)) {
+//            System.out.println("have that msg");
+//
+//            if (waitAck.get(msg).contains(serverId)) {
+//                waitAck.get(msg).add(serverId);
+//                System.out.println("add ack");
+//            }
+//            return true;
+//        }
         return false;
     }
 

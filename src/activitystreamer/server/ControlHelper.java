@@ -291,7 +291,7 @@ public class ControlHelper {
         // relay LOCK_ALLOWED only to the server which LOCK_REQUEST comes from
         if (lockRequestMap.get(username) != null) {
             Connection src = lockRequestMap.get(username);
-            src.writeMsg(request.getAsString());
+            src.writeMsg(new Gson().toJson(request));
         }
 
         return false;
@@ -393,10 +393,10 @@ public class ControlHelper {
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time", System.currentTimeMillis());
-        //TODO
-        System.out.println(broadcastAct);
-        broadcastToClient(con, broadcastAct);
+
         BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
+        broadcastToClient(con, broadcastAct);
+        System.out.println(broadcastAct.get("time"));
 //        relayMessage(con, broadcastAct);
         return false;
 
@@ -408,8 +408,10 @@ public class ControlHelper {
      * @return
      */
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
-//        BroadcastMessage.getInstance().injectMsg(con, msg);
-        System.out.println(msg);
+
+        // BroadcastMessage.getInstance().injectMsg(con, msg);
+        // if not received this msg, return ack and broadcast to clients.
+
         if (!receivedMsg.containsKey(msg)) {
 
             receivedMsg.put(msg, new String());
@@ -431,6 +433,7 @@ public class ControlHelper {
     private boolean onReceiveAck(Connection con, JsonObject request) {
         // return false if not from itself.
         if (!BroadcastMessage.getInstance().checkAck(request)) {
+//            JsonObject msg = request.getAsJsonObject("msg");
             relayMessage(con, request);
         }
 
@@ -462,7 +465,7 @@ public class ControlHelper {
      */
     private void broadcastToClient(JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
-        broadcastAct.remove("time");
+//        broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                     && c.isLoggedIn() && timeMill >= c.getConnTime()) {
@@ -470,15 +473,15 @@ public class ControlHelper {
             }
         }
     }
-    
+
     /**
      * overloaded method for initial activity message
-     *  
+     *
      * @param broadcastAct
      */
     private void broadcastToClient(Connection src, JsonObject broadcastAct) {
         long timeMill = broadcastAct.get("time").getAsLong();
-        broadcastAct.remove("time");
+//        broadcastAct.remove("time");
         for (Connection c : Control.getInstance().getConnections()) {
             if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
                     && c.isLoggedIn() && timeMill >= c.getConnTime() &&
