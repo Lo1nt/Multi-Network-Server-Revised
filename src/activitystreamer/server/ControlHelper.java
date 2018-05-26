@@ -390,9 +390,10 @@ public class ControlHelper {
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time", System.currentTimeMillis());
-
-        broadcastToClient(con, broadcastAct);
+        
         BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
+        broadcastToClient(con, broadcastAct);
+        
 //        relayMessage(con, broadcastAct);
         return false;
 
