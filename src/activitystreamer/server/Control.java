@@ -113,7 +113,7 @@ public class Control extends Thread {
         if (con.getName().equals(Connection.PARENT)) {
             int parentCount = otherServers.get(con.getSocket().getPort() + "").getAsJsonObject().get("parent_count").getAsInt();
             if (parentCount == 0) { // 如果是root节点挂了，单独处理:
-                // 这里需要预先run一个备用server，port: 3779
+                // requires running a backup server, port: 3779
                 Settings.setRemotePort(Settings.AUXILIARY_PORT);
                 initiateConnection();
             } else {
@@ -210,7 +210,6 @@ public class Control extends Thread {
                 log.info("received an interrupt, system is shutting down");
                 break;
             }
-
 
         }
         log.info("closing " + connections.size() + " connections");
