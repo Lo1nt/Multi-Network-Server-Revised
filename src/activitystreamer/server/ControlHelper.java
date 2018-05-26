@@ -21,7 +21,7 @@ public class ControlHelper {
     private Control control;
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
-
+    private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
 
     private ControlHelper() {
         control = Control.getInstance();
@@ -42,7 +42,10 @@ public class ControlHelper {
                         if (System.currentTimeMillis() - entry.getValue() > Settings.getActivityTimeout()) {
                             control.getOtherServers().remove(entry.getKey());
                             control.getLastAnnounceTimestamps().remove(entry.getKey());
-
+                            // update remainOtherServers in BroadcastMessage
+//                            if (BroadcastMessage.getInstance().remainOtherServers.containsKey(entry.getKey())) {
+//                                BroadcastMessage.getInstance().remainOtherServers.remove(entry.getKey());
+//                            }
                         }
                     }
                 }
@@ -83,6 +86,8 @@ public class ControlHelper {
                 return onReceiveActivityMessage(con, request);
             case Message.ACTIVITY_BROADCAST:
                 return onReceiveActivityBroadcast(con, request);
+            case Message.ACK:
+                return onReceiveAck(con, request);
             case Message.SERVER_ANNOUNCE:
                 return onReceiveServerAnnounce(con, request);
             case Message.SYNCHRONIZE_USER:
@@ -379,11 +384,36 @@ public class ControlHelper {
 
     }
 
-
+    /**
+     * @param con
+     * @param msg
+     * @return
+     */
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
 //        BroadcastMessage.getInstance().injectMsg(con, msg);
-        relayMessage(con, msg);
-        broadcastToClient(msg);
+        if (!receivedMsg.containsKey(msg)) {
+            receivedMsg.put(msg, new String());
+            relayMessage(con, msg);
+            broadcastToClient(msg);
+            Message.returnAck(con, msg);
+        } else {
+            relayMessage(con, msg);
+        }
+        return false;
+    }
+
+    /**
+     * Check whether this msg is from itself or send ack to another one.
+     *
+     * @param con
+     * @return
+     */
+    private boolean onReceiveAck(Connection con, JsonObject request) {
+        // return false if not from itself.
+        if (!BroadcastMessage.getInstance().checkAck(request)) {
+            relayMessage(con, request);
+        }
+
         return false;
     }
 
@@ -393,6 +423,7 @@ public class ControlHelper {
      * @param src
      * @param request
      */
+
     private void relayMessage(Connection src, JsonObject request) {
         for (Connection c : control.getConnections()) {
             if (c.getSocket().getInetAddress() != src.getSocket().getInetAddress()
@@ -401,7 +432,6 @@ public class ControlHelper {
             }
         }
     }
-
 
     /**
      * send message to valid user
