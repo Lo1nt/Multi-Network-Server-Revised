@@ -61,16 +61,17 @@ public class BroadcastMessage {
                         for (String serverId : snapList) {
                             if (!ackList.contains(serverId)) {
                                 flag = false;
+                                System.out.println("break");
                                 break;
                             }
                         }
                         if (!flag) {
                             relayMessage(message);
                         } else {
+                            System.out.println("success");
                             Message.broadCastSuccess(linkMsgCon.get(message), message);
                             waitAck.remove(message);
                             snapshotOtherServers.remove(message);
-                            waitAck.remove(message);
                         }
                     }
 //                    This one is complex. enhance when got time.
@@ -142,6 +143,7 @@ public class BroadcastMessage {
         linkMsgCon.put(msg, con);
         messageQueue.offer(msg);
         List<String> tmp = new ArrayList<>(Control.getInstance().getOtherServers().keySet());
+        // may use deep copy.
         snapshotOtherServers.put(msg, tmp);
 //        remainOtherServers.put(msg, tmp);
     }
@@ -149,9 +151,13 @@ public class BroadcastMessage {
     public boolean checkAck(JsonObject request) {
         JsonObject msg = (JsonObject) request.get("msg");
         String serverId = request.get("from").getAsString();
+        System.out.println("check ack");
         if (waitAck.containsKey(msg)) {
+            System.out.println("have that msg");
+
             if (waitAck.get(msg).contains(serverId)) {
                 waitAck.get(msg).add(serverId);
+                System.out.println("add ack");
             }
             return true;
         }

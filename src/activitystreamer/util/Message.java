@@ -49,6 +49,7 @@ public class Message {
     }
 
     public synchronized static boolean returnAck(Connection con, JsonObject msg) {
+        System.out.println("send ack");
         JsonObject json = new JsonObject();
         json.addProperty("command", Message.ACK);
         json.add("msg", msg);

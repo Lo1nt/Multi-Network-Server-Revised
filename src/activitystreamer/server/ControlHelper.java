@@ -390,7 +390,7 @@ public class ControlHelper {
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time", System.currentTimeMillis());
-        
+
         BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
         broadcastToClient(con, broadcastAct);
         System.out.println(broadcastAct.get("time"));
@@ -427,6 +427,7 @@ public class ControlHelper {
     private boolean onReceiveAck(Connection con, JsonObject request) {
         // return false if not from itself.
         if (!BroadcastMessage.getInstance().checkAck(request)) {
+            JsonObject msg = request.getAsJsonObject("msg");
             relayMessage(con, request);
         }
 
@@ -450,7 +451,6 @@ public class ControlHelper {
     }
 
 
-
     /**
      * send message to valid user
      *
@@ -466,10 +466,10 @@ public class ControlHelper {
             }
         }
     }
-    
+
     /**
      * overloaded method for initial activity message
-     *  
+     *
      * @param broadcastAct
      */
     private void broadcastToClient(Connection src, JsonObject broadcastAct) {
