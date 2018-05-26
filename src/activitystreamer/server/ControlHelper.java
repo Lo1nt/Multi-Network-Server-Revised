@@ -422,11 +422,12 @@ public class ControlHelper {
             if (waitTime.equals(timestamp)) {
 //                broadcastToClient(msg);
                 relayMessage(con, msg);
+                System.out.println("just relay message");
 //                Message.returnAck(con, msg);
                 return false;
             }
         }
-
+        System.out.println("send back ack");
         receivedMsg.put(msg, new String());
         relayMessage(con, msg);
         broadcastToClient(msg);

@@ -164,10 +164,11 @@ public class BroadcastMessage {
             String waitTime = message.get("time").getAsString();
             if (waitTime.equals(timestamp)) {
                 waitAck.get(message).add(serverId);
+
                 return true;
             }
         }
-
+        System.out.println("resend ack");
 //        if (waitAck.containsKey(msg)) {
 //            System.out.println("have that msg");
 //
