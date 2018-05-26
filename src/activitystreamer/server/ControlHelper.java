@@ -12,6 +12,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.lang.reflect.Type;
+import java.sql.SQLOutput;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -392,7 +393,8 @@ public class ControlHelper {
         broadcastAct.addProperty("command", Message.ACTIVITY_BROADCAST);
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time", System.currentTimeMillis());
-
+        //TODO
+        System.out.println(broadcastAct);
         broadcastToClient(con, broadcastAct);
         BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
 //        relayMessage(con, broadcastAct);
@@ -407,7 +409,9 @@ public class ControlHelper {
      */
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
 //        BroadcastMessage.getInstance().injectMsg(con, msg);
+        System.out.println(msg);
         if (!receivedMsg.containsKey(msg)) {
+
             receivedMsg.put(msg, new String());
             relayMessage(con, msg);
             broadcastToClient(msg);
