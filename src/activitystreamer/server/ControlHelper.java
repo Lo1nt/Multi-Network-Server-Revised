@@ -393,7 +393,7 @@ public class ControlHelper {
         broadcastAct.add("activity", activity);
         broadcastAct.addProperty("time", System.currentTimeMillis());
 
-        clientBroadcast(con, broadcastAct);
+        broadcastToClient(con, broadcastAct);
         BroadcastMessage.getInstance().injectMsg(con, broadcastAct);
 //        relayMessage(con, broadcastAct);
         return false;
@@ -449,23 +449,7 @@ public class ControlHelper {
         }
     }
 
-    /**
-     * send message to valid user
-     *
-     * @param broadcastAct
-     */
-    private void clientBroadcast(Connection src, JsonObject broadcastAct) {
-        long timeMill = broadcastAct.get("time").getAsLong();
-        broadcastAct.remove("time");
-        for (Connection c : Control.getInstance().getConnections()) {
-            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
-                    && c.isLoggedIn() && timeMill >= c.getConnTime() &&
-                    c.getSocket().getInetAddress() != src.getSocket().getInetAddress()) {
-                c.writeMsg(broadcastAct.toString());
-            }
-        }
 
-    }
 
     /**
      * send message to valid user
@@ -481,7 +465,23 @@ public class ControlHelper {
                 c.writeMsg(broadcastAct.toString());
             }
         }
+    }
+    
+    /**
+     * overloaded method for initial activity message
+     *  
+     * @param broadcastAct
+     */
+    private void broadcastToClient(Connection src, JsonObject broadcastAct) {
+        long timeMill = broadcastAct.get("time").getAsLong();
+        broadcastAct.remove("time");
+        for (Connection c : Control.getInstance().getConnections()) {
+            if (!c.getName().equals(Connection.PARENT) && !c.getName().equals(Connection.CHILD)
+                    && c.isLoggedIn() && timeMill >= c.getConnTime() &&
+                    c.getSocket().getInetAddress() != src.getSocket().getInetAddress()) {
+                c.writeMsg(broadcastAct.toString());
+            }
+        }
 
     }
-
 }
