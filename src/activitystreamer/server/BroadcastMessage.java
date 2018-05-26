@@ -20,7 +20,7 @@ public class BroadcastMessage {
     private static ConcurrentLinkedQueue<JsonObject> messageQueue = new ConcurrentLinkedQueue<JsonObject>();
     // destroy when List has the same values with otherServers now.
     // this is used to record whether we have got the ack from still existing servers.
-    Map<JsonObject, List<String>> coveredServers = new ConcurrentHashMap<>();
+//    Map<JsonObject, List<String>> coveredServers = new ConcurrentHashMap<>();
     Map<JsonObject, Connection> linkMsgCon = new ConcurrentHashMap<>();
     // destroy when list has the same values with otherServers before.
     // this is used to record whether we have got ack from all servers, if not, when they reconnect, we sent it again.
@@ -29,7 +29,7 @@ public class BroadcastMessage {
     // work with waitAck
     private Map<JsonObject, List<String>> snapshotOtherServers = new ConcurrentHashMap<>();
     // work with coveredServers
-    public Map<JsonObject, List<String>> remainOtherServers = new ConcurrentHashMap<>();
+//    public Map<JsonObject, List<String>> remainOtherServers = new ConcurrentHashMap<>();
 
     //    private List<String> renewServerList =Collections.synchronizedList(new ArrayList<>());
     private BroadcastMessage() {
@@ -61,12 +61,11 @@ public class BroadcastMessage {
                         }
                         if (!flag) {
                             relayMessage(message);
-                        }
-                        else{
+                        } else {
                             Message.broadCastSuccess(linkMsgCon.get(message), message);
                             waitAck.remove(message);
                             snapshotOtherServers.remove(message);
-                            waitAck.remove(message)
+                            waitAck.remove(message);
                         }
                     }
 //                    This one is complex. enhance when got time.
@@ -133,19 +132,21 @@ public class BroadcastMessage {
     }
 
     public void injectMsg(Connection con, JsonObject msg) {
-        coveredServers.put(msg, Collections.synchronizedList(new ArrayList<>()));
+//        coveredServers.put(msg, Collections.synchronizedList(new ArrayList<>()));
         linkMsgCon.put(msg, con);
         messageQueue.offer(msg);
         List<String> tmp = new ArrayList<>(Control.getInstance().getOtherServers().keySet());
         snapshotOtherServers.put(msg, tmp);
-        remainOtherServers.put(msg, tmp);
+//        remainOtherServers.put(msg, tmp);
     }
 
     public boolean checkAck(JsonObject request) {
         JsonObject msg = (JsonObject) request.get("msg");
         String serverId = request.get("from").getAsString();
-        if (coveredServers.containsKey(msg)) {
-            coveredServers.get(msg).add(serverId);
+        if (waitAck.containsKey(msg)) {
+            if (waitAck.get(msg).contains(serverId)) {
+                waitAck.get(msg).add(serverId);
+            }
             return true;
         }
         return false;

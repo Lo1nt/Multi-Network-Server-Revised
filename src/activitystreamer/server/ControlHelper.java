@@ -21,7 +21,7 @@ public class ControlHelper {
     private Control control;
     private Map<String, Integer> lockAllowedCount;
     private Map<String, Connection> lockRequestMap; // username, source port
-
+    private Map<JsonObject, String> receivedMsg = new ConcurrentHashMap<>();
 
     private ControlHelper() {
         control = Control.getInstance();
@@ -43,11 +43,10 @@ public class ControlHelper {
                             control.getOtherServers().remove(entry.getKey());
                             control.getLastAnnounceTimestamps().remove(entry.getKey());
                             // update remainOtherServers in BroadcastMessage
-                            if (BroadcastMessage.getInstance().remainOtherServers.containsKey(entry.getKey())) {
-                                BroadcastMessage.getInstance().remainOtherServers.remove(entry.getKey());
-                            }
+//                            if (BroadcastMessage.getInstance().remainOtherServers.containsKey(entry.getKey())) {
+//                                BroadcastMessage.getInstance().remainOtherServers.remove(entry.getKey());
+//                            }
                         }
-
                     }
                 }
             }
@@ -390,9 +389,14 @@ public class ControlHelper {
      */
     private boolean onReceiveActivityBroadcast(Connection con, JsonObject msg) {
 //        BroadcastMessage.getInstance().injectMsg(con, msg);
-        relayMessage(con, msg);
-        broadcastToClient(msg);
-        Message.returnAck(con, msg);
+        if (!receivedMsg.containsKey(msg)) {
+            receivedMsg.put(msg, new String());
+            relayMessage(con, msg);
+            broadcastToClient(msg);
+            Message.returnAck(con, msg);
+        } else {
+            relayMessage(con, msg);
+        }
         return false;
     }
 
